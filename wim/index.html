@@ -140,66 +140,54 @@
             <div class="controls">
                 <button class="start-btn" id="startBtn">Start</button>
                 <button class="stop-btn" id="stopBtn" disabled>Stop</button>
-                <button class="reset-btn" id="resetBtn" disabled>Reset</button>
+                <button class="reset-btn" id="finishBtn">Finish</button>
             </div>
         </div>
         
         <div class="timer-section">
             <h2>Today's Results</h2>
+            <button class="reset-btn" id="clearBtn">Clear</button>
             <table id="resultsTable">
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Round</th>
-                        <th>Time</th>
+                        <th>Round 1</th>
+                        <th>Round 2</th>
+                        <th>Round 3</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody">
-                    <!-- Results will be added here -->
                 </tbody>
             </table>
-        </div>
-        
-        <div class="instructions">
-            <h2>How to Use This Timer</h2>
-            <ol>
-                <li>Play the Wim Hof breathing video above</li>
-                <li>Follow along with the breathing technique</li>
-                <li>When you're ready to hold your breath, click "Start"</li>
-                <li>When you need to breathe again, click "Stop"</li>
-                <li>Your time will be recorded in the table below with today's date</li>
-                <li>Click "Reset" to prepare for the next round</li>
-                <li>Complete all three rounds to get your full results</li>
-            </ol>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Timer elements
             const timerDisplay = document.getElementById('timer');
             const startBtn = document.getElementById('startBtn');
             const stopBtn = document.getElementById('stopBtn');
-            const resetBtn = document.getElementById('resetBtn');
+            const finishBtn = document.getElementById('finishBtn');
+            const clearBtn = document.getElementById('clearBtn');
             const roundIndicator = document.querySelector('.round-indicator');
             const resultsBody = document.getElementById('resultsBody');
             
             let interval;
+            let rounds = [];
             let seconds = 0;
             let isRunning = false;
             let currentRound = 1;
             
+            let results = [];
+
             // Initialize the current date
             const today = new Date();
             const formattedDate = today.toLocaleDateString();
             
-            // Start the timer
             startBtn.addEventListener('click', function() {
                 if (!isRunning) {
                     isRunning = true;
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
-                    resetBtn.disabled = true;
                     
                     interval = setInterval(function() {
                         seconds++;
@@ -208,36 +196,45 @@
                 }
             });
             
-            // Stop the timer
             stopBtn.addEventListener('click', function() {
                 if (isRunning) {
                     clearInterval(interval);
                     isRunning = false;
-                    startBtn.disabled = true;
+                    startBtn.disabled = false;
                     stopBtn.disabled = true;
-                    resetBtn.disabled = false;
                     
-                    // Save the result
-                    saveResult(formattedDate, currentRound, formatTime(seconds));
-                }
-            });
-            
-            // Reset the timer
-            resetBtn.addEventListener('click', function() {
-                if (currentRound < 3) {
-                    currentRound++;
-                    roundIndicator.textContent = `Round ${currentRound}`;
-                } else {
-                    currentRound = 1;
+                    rounds.push(formatTime(seconds));
+                    currentRound += 1
+                    if (currentRound == 4) {
+                      currentRound = 0;
+                      saveResult(formattedDate, rounds);
+                      rounds = [];
+                    }
+                    seconds = 0;
+                    updateTimerDisplay();
                     roundIndicator.textContent = `Round ${currentRound}`;
                 }
-                
-                seconds = 0;
-                updateTimerDisplay();
-                startBtn.disabled = false;
-                resetBtn.disabled = true;
             });
-            
+
+            finishBtn.addEventListener('click', function() {
+              clearInterval(interval);
+              isRunning = false;
+              startBtn.disabled = false;
+              stopBtn.disabled = true;
+              saveResult(formattedDate, rounds);
+              rounds = [];
+              seconds = 0;
+              updateTimerDisplay();
+              roundIndicator.textContent = `Round ${currentRound}`;
+            });
+
+            clearBtn.addEventListener('click', function() {
+                localStorage.setItem('wimHofResults', "");
+                results = "";
+              resultsBody.innerHTML = "";
+            });
+
+
             // Update the timer display
             function updateTimerDisplay() {
                 timerDisplay.textContent = formatTime(seconds);
@@ -251,61 +248,42 @@
                 return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
             
-            // Save result to the table
-            function saveResult(date, round, time) {
+            function displayResult(date, rounds) {
                 const row = document.createElement('tr');
-                
+
                 const dateCell = document.createElement('td');
                 dateCell.textContent = date;
-                
-                const roundCell = document.createElement('td');
-                roundCell.textContent = round;
-                
-                const timeCell = document.createElement('td');
-                timeCell.textContent = time;
-                
                 row.appendChild(dateCell);
-                row.appendChild(roundCell);
-                row.appendChild(timeCell);
-                
+
+                for (let round of rounds) {
+                  const roundCell = document.createElement('td');
+                  roundCell.textContent = round;
+                  row.appendChild(roundCell);
+                }
+
                 resultsBody.appendChild(row);
-                
+            }
+
+            function saveResult(date, rounds) {
+                displayResult(date, rounds);
+
                 // Save to local storage
-                const results = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
-                results.push({ date, round, time });
+                results.push({date, rounds});
                 localStorage.setItem('wimHofResults', JSON.stringify(results));
             }
-            
+
             // Load saved results from local storage
             function loadSavedResults() {
-                const results = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
-                
+                results = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
+
                 results.forEach(result => {
-                    const row = document.createElement('tr');
-                    
-                    const dateCell = document.createElement('td');
-                    dateCell.textContent = result.date;
-                    
-                    const roundCell = document.createElement('td');
-                    roundCell.textContent = result.round;
-                    
-                    const timeCell = document.createElement('td');
-                    timeCell.textContent = result.time;
-                    
-                    row.appendChild(dateCell);
-                    row.appendChild(roundCell);
-                    row.appendChild(timeCell);
-                    
-                    resultsBody.appendChild(row);
+                    console.log(result);
+                    displayResult(result.date, result.rounds);
                 });
             }
-            
-            // Initialize the timer display
+
             updateTimerDisplay();
-            
-            // Load saved results
             loadSavedResults();
-        });
     </script>
 </body>
 </html>
