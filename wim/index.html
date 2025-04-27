@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wim Hof Breathing Timer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8ff;
+            color: #333;
+        }
+        h1, h2 {
+            color: #0066cc;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .video-wrapper {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .video-container {
+            position: relative;
+            width: 50%;
+            padding-bottom: 28.125%;
+            height: 0;
+            overflow: hidden;
+            background-color: #000;
+            border-radius: 8px;
+        }
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .timer-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .timer-display {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            color: #0066cc;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .start-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .stop-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        .reset-btn {
+            background-color: #2196F3;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .round-indicator {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #0066cc;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .instructions {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .instructions ul {
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <h1>Wim Hof Breathing Timer</h1>
+    
+    <div class="container">
+        <div class="video-wrapper">
+        <div class="video-container">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/tybOi4hjZFQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        </div>
+        
+        <div class="timer-section">
+            <h2>Breath Hold Timer</h2>
+            <div class="round-indicator">Round 1</div>
+            <div class="timer-display" id="timer">00:00</div>
+            <div class="controls">
+                <button class="start-btn" id="startBtn">Start</button>
+                <button class="stop-btn" id="stopBtn" disabled>Stop</button>
+                <button class="reset-btn" id="resetBtn" disabled>Reset</button>
+            </div>
+        </div>
+        
+        <div class="timer-section">
+            <h2>Today's Results</h2>
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Round</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody">
+                    <!-- Results will be added here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="instructions">
+            <h2>How to Use This Timer</h2>
+            <ol>
+                <li>Play the Wim Hof breathing video above</li>
+                <li>Follow along with the breathing technique</li>
+                <li>When you're ready to hold your breath, click "Start"</li>
+                <li>When you need to breathe again, click "Stop"</li>
+                <li>Your time will be recorded in the table below with today's date</li>
+                <li>Click "Reset" to prepare for the next round</li>
+                <li>Complete all three rounds to get your full results</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Timer elements
+            const timerDisplay = document.getElementById('timer');
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const roundIndicator = document.querySelector('.round-indicator');
+            const resultsBody = document.getElementById('resultsBody');
+            
+            let interval;
+            let seconds = 0;
+            let isRunning = false;
+            let currentRound = 1;
+            
+            // Initialize the current date
+            const today = new Date();
+            const formattedDate = today.toLocaleDateString();
+            
+            // Start the timer
+            startBtn.addEventListener('click', function() {
+                if (!isRunning) {
+                    isRunning = true;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    resetBtn.disabled = true;
+                    
+                    interval = setInterval(function() {
+                        seconds++;
+                        updateTimerDisplay();
+                    }, 1000);
+                }
+            });
+            
+            // Stop the timer
+            stopBtn.addEventListener('click', function() {
+                if (isRunning) {
+                    clearInterval(interval);
+                    isRunning = false;
+                    startBtn.disabled = true;
+                    stopBtn.disabled = true;
+                    resetBtn.disabled = false;
+                    
+                    // Save the result
+                    saveResult(formattedDate, currentRound, formatTime(seconds));
+                }
+            });
+            
+            // Reset the timer
+            resetBtn.addEventListener('click', function() {
+                if (currentRound < 3) {
+                    currentRound++;
+                    roundIndicator.textContent = `Round ${currentRound}`;
+                } else {
+                    currentRound = 1;
+                    roundIndicator.textContent = `Round ${currentRound}`;
+                }
+                
+                seconds = 0;
+                updateTimerDisplay();
+                startBtn.disabled = false;
+                resetBtn.disabled = true;
+            });
+            
+            // Update the timer display
+            function updateTimerDisplay() {
+                timerDisplay.textContent = formatTime(seconds);
+            }
+            
+            // Format time as MM:SS
+            function formatTime(totalSeconds) {
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                
+                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            // Save result to the table
+            function saveResult(date, round, time) {
+                const row = document.createElement('tr');
+                
+                const dateCell = document.createElement('td');
+                dateCell.textContent = date;
+                
+                const roundCell = document.createElement('td');
+                roundCell.textContent = round;
+                
+                const timeCell = document.createElement('td');
+                timeCell.textContent = time;
+                
+                row.appendChild(dateCell);
+                row.appendChild(roundCell);
+                row.appendChild(timeCell);
+                
+                resultsBody.appendChild(row);
+                
+                // Save to local storage
+                const results = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
+                results.push({ date, round, time });
+                localStorage.setItem('wimHofResults', JSON.stringify(results));
+            }
+            
+            // Load saved results from local storage
+            function loadSavedResults() {
+                const results = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
+                
+                results.forEach(result => {
+                    const row = document.createElement('tr');
+                    
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = result.date;
+                    
+                    const roundCell = document.createElement('td');
+                    roundCell.textContent = result.round;
+                    
+                    const timeCell = document.createElement('td');
+                    timeCell.textContent = result.time;
+                    
+                    row.appendChild(dateCell);
+                    row.appendChild(roundCell);
+                    row.appendChild(timeCell);
+                    
+                    resultsBody.appendChild(row);
+                });
+            }
+            
+            // Initialize the timer display
+            updateTimerDisplay();
+            
+            // Load saved results
+            loadSavedResults();
+        });
+    </script>
+</body>
+</html>
