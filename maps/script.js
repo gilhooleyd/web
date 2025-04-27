@@ -10,6 +10,22 @@ if (apiKey) {
   apiKeyInput.value = apiKey;
 }
 
+function loadGoogleMapsThen(callback) {
+  if (window.google && window.google.maps) {
+    callback();
+    return;
+  }
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+  script.async = true;
+  script.defer = true;
+  script.onload = callback;
+  script.onerror = () => {
+    alert('Failed to load Google Maps API. Please check your API key and internet connection.');
+  };
+  document.head.appendChild(script);
+}
+
 findRestaurantsButton.addEventListener('click', () => {
   const apiKey = apiKeyInput.value.trim();
   if (!apiKey) {
@@ -26,23 +42,7 @@ findRestaurantsButton.addEventListener('click', () => {
 
   resultsList.innerHTML = ''; // Clear previous results
 
-  // Load the Google Maps API script with the user's API key
-  if (!window.google || !window.google.maps) {
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-
-    script.onload = () => {
-        fetchRestaurantData(restaurantNames);
-    };
-    script.onerror = () => {
-      alert('Failed to load Google Maps API. Please check your API key and internet connection.');
-    };
-    return;
-  }
-  fetchRestaurantData(restaurantNames);
+  loadGoogleMapsThen(() => { fetchRestaurantData(restaurantNames); });
 });
 
 function displayResult(placeId, restaurantName, rating, reviewCount) {
