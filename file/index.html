@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File System Access API Demo</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f4f8;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem; /* rounded corners */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 2.5rem;
+            max-width: 800px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .message-box {
+            background-color: #fee2e2;
+            color: #ef4444;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none; /* Hidden by default */
+            font-weight: 500;
+        }
+        .message-box.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">File System Access Demo</h1>
+
+        <!-- Message Box for errors/info -->
+        <div id="messageBox" class="message-box"></div>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <button id="selectFileButton" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 shadow-md">
+                Select File to Read/Write
+            </button>
+            <button id="saveFileButton" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-xl transition duration-300 shadow-md opacity-50 cursor-not-allowed" disabled>
+                Save Changes to File
+            </button>
+        </div>
+
+        <textarea id="fileContent" class="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-800 bg-gray-50 resize-y" placeholder="File content will appear here..." readonly></textarea>
+
+        <p class="text-sm text-gray-600 mt-4 text-center">
+            This demo uses the <span class="font-medium text-blue-700">File System Access API</span>.
+            It requires user gesture to open and save files.
+        </p>
+    </div>
+
+    <script>
+        // Global variables for file handle, UI elements, and IndexedDB
+        let fileHandle = null;
+        let db; // IndexedDB database instance
+        const DB_NAME = 'FileSystemAccessDB';
+        const STORE_NAME = 'fileHandles';
+        const FILE_HANDLE_KEY = 'lastFileHandle'; // Key for the single file handle
+
+        const selectFileButton = document.getElementById('selectFileButton');
+        const saveFileButton = document.getElementById('saveFileButton');
+        const fileContentTextarea = document.getElementById('fileContent');
+        const messageBox = document.getElementById('messageBox');
+
+        /**
+         * Displays a message in the message box.
+         * @param {string} message The message to display.
+         * @param {boolean} isError Whether the message is an error.
+         */
+        function showMessage(message, isError = false) {
+            messageBox.textContent = message;
+            messageBox.className = 'message-box show'; // Reset classes
+            if (isError) {
+                messageBox.classList.add('bg-red-100', 'text-red-700');
+            } else {
+                messageBox.classList.add('bg-green-100', 'text-green-700');
+            }
+            // Hide after a few seconds
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, 5000);
+        }
+
+        /**
+         * Enables or disables the save button and content area.
+         * @param {boolean} enable True to enable, false to disable.
+         */
+        function toggleSaveCapability(enable) {
+            saveFileButton.disabled = !enable;
+            if (enable) {
+                saveFileButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                fileContentTextarea.removeAttribute('readonly');
+            } else {
+                saveFileButton.classList.add('opacity-50', 'cursor-not-allowed');
+                fileContentTextarea.setAttribute('readonly', 'true');
+            }
+        }
+
+        /**
+         * Initializes and opens the IndexedDB database.
+         * @returns {Promise<IDBDatabase>} A promise that resolves with the database instance.
+         */
+        function openDb() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1); // Version 1
+
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    // Create an object store to hold file handles
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onerror = (event) => {
+                    console.error("IndexedDB error:", event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        }
+
+        /**
+         * Saves the FileSystemFileHandle to IndexedDB.
+         * @param {FileSystemFileHandle} handle The file handle to save.
+         */
+        async function saveHandle(handle) {
+            try {
+                // Ensure DB is open before transaction
+                if (!db) db = await openDb();
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(handle, FILE_HANDLE_KEY);
+
+                await new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+                console.log("File handle saved to IndexedDB.");
+            } catch (error) {
+                console.error("Error saving handle to IndexedDB:", error);
+                showMessage("Could not persist file handle. " + error.message, true);
+            }
+        }
+
+        /**
+         * Retrieves the FileSystemFileHandle from IndexedDB.
+         * @returns {Promise<FileSystemFileHandle|null>} A promise that resolves with the file handle or null if not found.
+         */
+        async function getHandle() {
+            try {
+                // Ensure DB is open before transaction
+                if (!db) db = await openDb();
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(FILE_HANDLE_KEY);
+
+                return await new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve(request.result || null);
+                    request.onerror = () => reject(request.error);
+                });
+            } catch (error) {
+                console.error("Error retrieving handle from IndexedDB:", error);
+                showMessage("Could not retrieve persisted file handle. " + error.message, true);
+                return null;
+            }
+        }
+
+        /**
+         * Opens a file picker, reads the selected file's content,
+         * and stores the file handle for subsequent writes.
+         */
+        async function openFile() {
+            try {
+                // Ensure the File System Access API is supported
+                if (!window.showOpenFilePicker) {
+                    showMessage("File System Access API is not supported in your browser.", true);
+                    return;
+                }
+
+                // Open file picker. `multiple` is false to select a single file.
+                // `types` specifies acceptable file types.
+                [fileHandle] = await window.showOpenFilePicker({
+                    types: [{
+                        description: 'Text Files',
+                        accept: {
+                            'text/plain': ['.txt'],
+                            'text/html': ['.html', '.htm'],
+                            'application/json': ['.json'],
+                            'text/markdown': ['.md'],
+                        },
+                    }],
+                    multiple: false,
+                });
+
+                // Get the File object from the file handle
+                const file = await fileHandle.getFile();
+                // Read the file content as text
+                const contents = await file.text();
+
+                // Display the content in the textarea
+                fileContentTextarea.value = contents;
+                showMessage(`File "${file.name}" opened successfully.`, false);
+                toggleSaveCapability(true); // Enable saving
+
+                // Save the file handle to IndexedDB for persistence
+                await saveHandle(fileHandle);
+
+            } catch (error) {
+                // Handle user cancellation or other errors
+                if (error.name === 'AbortError') {
+                    showMessage("File selection cancelled.", false);
+                } else {
+                    showMessage(`Error opening file: ${error.message}`, true);
+                    console.error("Error opening file:", error);
+                }
+                toggleSaveCapability(false); // Disable saving on error
+            }
+        }
+
+        /**
+         * Writes the content from the textarea back to the currently selected file.
+         */
+        async function saveFile() {
+            if (!fileHandle) {
+                showMessage("No file selected to save. Please select a file first.", true);
+                return;
+            }
+
+            try {
+                // Request write permission for the file handle.
+                // This is crucial, especially if the file was just opened for read.
+                const permissionStatus = await fileHandle.requestPermission({ mode: 'readwrite' });
+                if (permissionStatus !== 'granted') {
+                    showMessage("Write permission denied. Cannot save file. Please grant permission if prompted.", true);
+                    return;
+                }
+
+                // Create a WritableStream to write to the file
+                const writable = await fileHandle.createWritable();
+
+                // Write the current content from the textarea to the stream
+                await writable.write(fileContentTextarea.value);
+
+                // Close the stream, which commits the changes to the file
+                await writable.close();
+
+                const file = await fileHandle.getFile(); // Get updated file info for name
+                showMessage(`Changes saved to "${file.name}" successfully!`, false);
+
+            } catch (error) {
+                showMessage(`Error saving file: ${error.message}`, true);
+                console.error("Error saving file:", error);
+            }
+        }
+
+        // Event listener for when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize IndexedDB first
+            try {
+                await openDb();
+            } catch (error) {
+                showMessage("Failed to initialize database. " + error.message, true);
+                return;
+            }
+
+            // Try to retrieve a persisted file handle
+            const persistedHandle = await getHandle();
+            if (persistedHandle) {
+                fileHandle = persistedHandle;
+                showMessage("Attempting to re-open previously selected file...");
+                try {
+                    // Check if permission is still granted or needs re-prompting
+                    // Requesting permission will prompt the user if it's 'prompt' state
+                    const permissionStatus = await fileHandle.requestPermission({ mode: 'readwrite' });
+
+                    if (permissionStatus === 'granted') {
+                        // If permission is granted, get the file and display its content
+                        const file = await fileHandle.getFile();
+                        const contents = await file.text();
+                        fileContentTextarea.value = contents;
+                        showMessage(`Successfully re-opened "${file.name}". You can now edit and save.`, false);
+                        toggleSaveCapability(true);
+                    } else {
+                        // Permission was 'denied' or the user closed the prompt
+                        showMessage("Permission to access the previously opened file was not granted. Please select the file again.", true);
+                        toggleSaveCapability(false);
+                        fileHandle = null; // Clear handle if permission failed
+                    }
+                } catch (error) {
+                    // This catches errors if the file no longer exists or the handle is invalid
+                    showMessage(`Error re-opening file: ${error.message}. Please select a file again.`, true);
+                    console.error("Error re-opening persisted file:", error);
+                    toggleSaveCapability(false);
+                    fileHandle = null; // Clear handle if an error occurred
+                }
+            } else {
+                // No persisted file handle found
+                showMessage("No previously opened file found. Please select a file.", false);
+                toggleSaveCapability(false); // Ensure save button is disabled
+            }
+
+            // Attach event listeners after initial load logic
+            selectFileButton.addEventListener('click', openFile);
+            saveFileButton.addEventListener('click', saveFile);
+        });
+    </script>
+</body>
+</html>
+
