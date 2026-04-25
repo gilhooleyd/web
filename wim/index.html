@@ -1,289 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wim Hof Breathing Timer</title>
+    <link rel="stylesheet" href="tacit-css.css"/>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f0f8ff;
-            color: #333;
-        }
-        h1, h2 {
-            color: #0066cc;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .video-wrapper {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        .video-container {
-            position: relative;
-            width: 50%;
-            padding-bottom: 28.125%;
-            height: 0;
-            overflow: hidden;
-            background-color: #000;
-            border-radius: 8px;
-        }
-        .video-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        .timer-section {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .timer-display {
-            font-size: 48px;
-            font-weight: bold;
-            text-align: center;
-            margin: 10px 0;
-            color: #0066cc;
-        }
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .start-btn {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .stop-btn {
-            background-color: #f44336;
-            color: white;
-        }
-        .reset-btn {
-            background-color: #2196F3;
-            color: white;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        .round-indicator {
-            text-align: center;
-            font-size: 24px;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background-color: #0066cc;
-            color: white;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        .instructions {
-            background-color: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .instructions ul {
-            line-height: 1.6;
-        }
+    h1:first-child, h2:first-child {
+      margin-top: 0;
+      color: #0066cc;
+    }
+    body {
+      background-color: #f0f8ff;
+    }
+    section {
+      background-color: white;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .video-container {
+      position: relative;
+      width: 50%;
+      margin: 0 auto 1rem auto;
+      padding-bottom: 28.125%; /* 50% of 56.25% to maintain 16:9 for half width */
+      height: 0;
+      overflow: hidden;
+    }
+    .video-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .timer-display {
+      font-size: 3rem;
+      text-align: center;
+      display: block;
+      margin: 1rem 0;
+    }
+    .round-indicator {
+      text-align: center;
+      font-weight: bold;
+    }
+    .heatmap-container {
+      overflow-x: auto;
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    .stats-prominent {
+      display: flex;
+      gap: 2rem;
+      margin: 1rem 0 2rem 0;
+    }
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .stat-value {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #0066cc;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: #666;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .heatmap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .heatmap-year {
+      font-size: 0.9rem;
+      color: #888;
+    }
+    .heatmap-months {
+      display: grid;
+      grid-auto-flow: column;
+      grid-gap: 3px;
+      margin-bottom: 5px;
+      font-size: 0.7rem;
+      color: #888;
+      height: 1rem;
+    }
+    .heatmap-month-label {
+      white-space: nowrap;
+    }
+    .heatmap-grid {
+      display: grid;
+      grid-template-rows: repeat(7, 10px);
+      grid-auto-flow: column;
+      grid-gap: 3px;
+      width: max-content;
+    }
+    .heatmap-day {
+      width: 10px;
+      height: 10px;
+      background-color: #ebedf0;
+      border-radius: 2px;
+    }
+    .heatmap-day.active {
+      background-color: #4CAF50;
+    }
+    #startBtn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    #stopBtn {
+      background-color: #f44336;
+      color: white;
+    }
+    #finishBtn {
+      background-color: #2196F3;
+      color: white;
+    }
+    button:disabled {
+      background-color: #cccccc !important;
+      color: #666;
+      cursor: not-allowed;
+    }
     </style>
-</head>
-<body>
-    <h1>Wim Hof Breathing Timer</h1>
-    
-    <div class="container">
-        <div class="video-wrapper">
-        <div class="video-container">
-            <iframe width="560" height="315" src="https://www.youtube.com/embed/tybOi4hjZFQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-        </div>
-        </div>
-        
-        <div class="timer-section">
-            <h2>Breath Hold Timer</h2>
-            <div class="round-indicator">Round 1</div>
-            <div class="timer-display" id="timer">00:00</div>
-            <div class="controls">
-                <button class="start-btn" id="startBtn">Start</button>
-                <button class="stop-btn" id="stopBtn" disabled>Stop</button>
-                <button class="reset-btn" id="finishBtn">Finish</button>
-            </div>
-        </div>
-        
-        <div class="timer-section">
-            <h2>Today's Results</h2>
-            <button class="reset-btn" id="clearBtn">Clear</button>
-            <table id="resultsTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Round 1</th>
-                        <th>Round 2</th>
-                        <th>Round 3</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsBody">
-                </tbody>
-            </table>
-        </div>
+  </head>
+  <body>
+    <nav>
+      <h1>Wim Hof Breathing Timer</h1>
+    </nav>
+    <div class="video-container">
+      <iframe src="https://www.youtube.com/embed/tybOi4hjZFQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     </div>
 
-    <script>
-            const timerDisplay = document.getElementById('timer');
-            const startBtn = document.getElementById('startBtn');
-            const stopBtn = document.getElementById('stopBtn');
-            const finishBtn = document.getElementById('finishBtn');
-            const clearBtn = document.getElementById('clearBtn');
-            const roundIndicator = document.querySelector('.round-indicator');
-            const resultsBody = document.getElementById('resultsBody');
-            
-            let interval;
-            let rounds = [];
-            let seconds = 0;
-            let isRunning = false;
-            let currentRound = 1;
-            
-            let results = [];
+    <div id="timer-mount"></div>
+    <div id="heatmap-mount"></div>
+    <div id="results-mount"></div>
 
-            // Initialize the current date
-            const today = new Date();
-            const formattedDate = today.toLocaleDateString();
-            
-            startBtn.addEventListener('click', function() {
-                if (!isRunning) {
-                    isRunning = true;
-                    startBtn.disabled = true;
-                    stopBtn.disabled = false;
-                    
-                    interval = setInterval(function() {
-                        seconds++;
-                        updateTimerDisplay();
-                    }, 1000);
-                }
-            });
-            
-            stopBtn.addEventListener('click', function() {
-                if (isRunning) {
-                    clearInterval(interval);
-                    isRunning = false;
-                    startBtn.disabled = false;
-                    stopBtn.disabled = true;
-                    
-                    rounds.push(formatTime(seconds));
-                    currentRound += 1
-                    if (currentRound == 4) {
-                      currentRound = 0;
-                      saveResult(formattedDate, rounds);
-                      rounds = [];
-                    }
-                    seconds = 0;
-                    updateTimerDisplay();
-                    roundIndicator.textContent = `Round ${currentRound}`;
-                }
-            });
-
-            finishBtn.addEventListener('click', function() {
-              clearInterval(interval);
-              isRunning = false;
-              startBtn.disabled = false;
-              stopBtn.disabled = true;
-              saveResult(formattedDate, rounds);
-              rounds = [];
-              seconds = 0;
-              updateTimerDisplay();
-              roundIndicator.textContent = `Round ${currentRound}`;
-            });
-
-            clearBtn.addEventListener('click', function() {
-                localStorage.setItem('wimHofResults', "");
-                results = "";
-              resultsBody.innerHTML = "";
-            });
-
-
-            // Update the timer display
-            function updateTimerDisplay() {
-                timerDisplay.textContent = formatTime(seconds);
-            }
-            
-            // Format time as MM:SS
-            function formatTime(totalSeconds) {
-                const minutes = Math.floor(totalSeconds / 60);
-                const seconds = totalSeconds % 60;
-                
-                return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-            
-            function displayResult(date, rounds) {
-                const row = document.createElement('tr');
-
-                const dateCell = document.createElement('td');
-                dateCell.textContent = date;
-                row.appendChild(dateCell);
-
-                for (let round of rounds) {
-                  const roundCell = document.createElement('td');
-                  roundCell.textContent = round;
-                  row.appendChild(roundCell);
-                }
-
-                resultsBody.appendChild(row);
-            }
-
-            function saveResult(date, rounds) {
-                displayResult(date, rounds);
-
-                // Save to local storage
-                results.push({date, rounds});
-                localStorage.setItem('wimHofResults', JSON.stringify(results));
-            }
-
-            // Load saved results from local storage
-            function loadSavedResults() {
-                results = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
-
-                results.forEach(result => {
-                    console.log(result);
-                    displayResult(result.date, result.rounds);
-                });
-            }
-
-            updateTimerDisplay();
-            loadSavedResults();
-    </script>
-</body>
+  </body>
+  <script src="mithril.js"></script>
+  <script src="script.js"></script>
 </html>
