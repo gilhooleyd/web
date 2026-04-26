@@ -54,26 +54,26 @@ const Results = {
   },
 
   view: () => {
-    return m("section", [
-      m("h2", "History"),
-      m("button#clearBtn", { onclick: Results.clear }, "Clear History"),
-      m("table#resultsTable", [
-        m("thead", [
-          m("tr", [
-            m("th", "Date"),
-            m("th", "Round 1"),
-            m("th", "Round 2"),
-            m("th", "Round 3")
-          ])
-        ]),
-        m("tbody", Results.data.slice().reverse().map(result => {
-          return m("tr", [
-            m("td", result.date),
-            result.rounds.map(round => m("td", round))
-          ]);
-        }))
-      ])
-    ]);
+    return h(["section", [
+      ["h2", "History"],
+      ["button#clearBtn", { onclick: Results.clear }, "Clear History"],
+      ["table#resultsTable", [
+        ["thead", [
+          ["tr", [
+            ["th", "Date"],
+            ["th", "Round 1"],
+            ["th", "Round 2"],
+            ["th", "Round 3"],
+          ]]
+        ]],
+        ["tbody", Results.data.slice().reverse().map(result => {
+          return ["tr", [
+            ["td", result.date],
+            result.rounds.map(round => ["td", round])
+          ]];
+        })],
+      ]],
+    ]]);
   }
 };
 
@@ -125,35 +125,35 @@ const Heatmap = {
     const { year, days, monthLabels } = Heatmap.getYearData();
     const { totalTime, streak } = Results.getStats();
 
-    return m("section", [
-      m(".heatmap-header", [
-        m("h2", "Activity Stats"),
-        m("span.heatmap-year", year)
-      ]),
-      m(".stats-prominent", [
-        m(".stat-card", [
-          m(".stat-label", "Total time"),
-          m(".stat-value", totalTime)
-        ]),
-        m(".stat-card", [
-          m(".stat-label", "Current streak"),
-          m(".stat-value", `${streak} days`)
-        ])
-      ]),
-      m(".heatmap-container", [
-        m(".heatmap-months", { style: { gridTemplateColumns: `repeat(${Math.ceil(days.length / 7)}, 10px)` } }, 
-          monthLabels.map(mLabel => m("span.heatmap-month-label", {
+    return h(["section", [
+      [".heatmap-header", [
+        ["h2", "Activity Stats"],
+        ["span.heatmap-year", year]
+      ]],
+      [".stats-prominent", [
+        [".stat-card", [
+          [".stat-label", "Total time"],
+          [".stat-value", totalTime]
+        ]],
+        [".stat-card", [
+          [".stat-label", "Current streak"],
+          [".stat-value", `${streak} days`],
+        ]]
+      ]],
+      [".heatmap-container", [
+        [".heatmap-months", { style: { gridTemplateColumns: `repeat(${Math.ceil(days.length / 7)}, 10px)` } }, 
+          monthLabels.map(mLabel => ["span.heatmap-month-label", {
             style: { gridColumnStart: mLabel.index + 1 }
-          }, mLabel.name))
-        ),
-        m(".heatmap-grid", days.map(day => {
-          return m(".heatmap-day", {
+          }, mLabel.name])
+        ],
+        [".heatmap-grid", days.map(day => {
+          return [".heatmap-day", {
             class: day.active ? "active" : "",
             title: day.date
-          });
-        }))
-      ])
-    ]);
+          }];
+        })]
+      ]]
+    ]]);
   }
 };
 
@@ -207,24 +207,24 @@ const Timer = {
   },
 
   view: () => {
-    return m("section", [
-      m("h2", "Breath Hold Timer"),
-      m("p.round-indicator", `Round ${Timer.currentRound}`),
-      m("span#timer.timer-display", formatTime(Timer.seconds)),
-      m("nav", [
-        m("button#startBtn", {
+    return h(["section", [
+      ["h2", "Breath Hold Timer"],
+      ["p.round-indicator", `Round ${Timer.currentRound}`],
+      ["span#timer.timer-display", formatTime(Timer.seconds)],
+      ["nav", [
+        ["button#startBtn", {
           onclick: Timer.start,
           disabled: Timer.isRunning
-        }, "Start"),
-        m("button#stopBtn", {
+        }, "Start"],
+        ["button#stopBtn", {
           onclick: Timer.stop,
           disabled: !Timer.isRunning
-        }, "Stop"),
-        m("button#finishBtn", {
+        }, "Stop"],
+        ["button#finishBtn", {
           onclick: Timer.finish
-        }, "Finish")
-      ])
-    ]);
+        }, "Finish"]
+      ]]
+    ]]);
   }
 };
 

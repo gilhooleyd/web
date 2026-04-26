@@ -1696,3 +1696,25 @@ m.domFor = domFor
 if (typeof module !== "undefined") module["exports"] = m
 else window.m = m
 }());
+
+// Define h function
+const isString = x => typeof x === 'string'
+const isArray = Array.isArray
+const arrayPush = Array.prototype.push
+const isObject = x => typeof x === 'object' && !isArray(x)
+
+const clean = (arr, n) => (
+  n && arrayPush.apply(arr, isString(n[0]) ? [n] : n), arr
+)
+
+const child = (n, cb) => {
+  if (n == null) return [];
+  if (!isArray(n)) return [n + ""];
+  return n.reduce(clean, []).map(cb);
+}
+
+const h = (node) => {
+  if (isString(node)) return node;
+  if (!isObject(node[1])) return h([node[0], {}, node[1]]);
+  return m(node[0], node[1], child(node[2], h));
+}
