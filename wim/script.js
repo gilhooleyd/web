@@ -4,19 +4,66 @@ const formattedDate = today.toLocaleDateString();
 // Results State & Component
 const Results = {
   data: [],
+  isEditMode: false,
 
   load: () => {
     Results.data = JSON.parse(localStorage.getItem('wimHofResults') || '[]');
   },
 
-  add: (date, rounds) => {
-    Results.data.push({ date, rounds });
+  save: () => {
     localStorage.setItem('wimHofResults', JSON.stringify(Results.data));
   },
 
+  add: (date, rounds) => {
+    Results.data.push({ date, rounds });
+    Results.save();
+  },
+
+  delete: (index) => {
+    Results.data.splice(index, 1);
+    Results.save();
+  },
+
   clear: () => {
-    Results.data = [];
-    localStorage.setItem('wimHofResults', JSON.stringify([]));
+    if (confirm('Are you sure you want to clear all history?')) {
+      Results.data = [];
+      Results.save();
+    }
+  },
+
+  toggleEditMode: () => {
+    Results.isEditMode = !Results.isEditMode;
+  },
+
+  exportData: () => {
+    const data = JSON.stringify(Results.data, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wim-hof-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  importData: (file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target.result);
+        if (Array.isArray(imported)) {
+          Results.data = imported;
+          Results.save();
+          m.redraw();
+          alert('Import successful!');
+        } else {
+          alert('Invalid file format. Expected an array of results.');
+        }
+      } catch (err) {
+        alert('Error parsing JSON file.');
+      }
+    };
+    reader.readAsText(file);
   },
 
   getStats: () => {
@@ -26,8 +73,10 @@ const Results = {
     Results.data.forEach(r => {
       activeDates.add(r.date);
       r.rounds.forEach(round => {
-        const [m, s] = round.split(':').map(Number);
-        totalSeconds += (m * 60) + s;
+        if (round) {
+          const [m, s] = round.split(':').map(Number);
+          totalSeconds += (m * 60) + s;
+        }
       });
     });
 
@@ -45,18 +94,44 @@ const Results = {
     }
 
     // Format Total Time
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = totalSeconds % 60;
-    const totalTime = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const totalTime = hours > 0 ? `${hours}h ${minutes}m ${seconds}s` : `${minutes}m ${seconds}s`;
 
     return { totalTime, streak };
   },
 
   view: () => {
     return h(["section", [
+      [".top-right", [
+        ["button.btn-secondary", { 
+          style: { marginRight: '0.5rem' },
+          onclick: Results.exportData 
+        }, "Export"],
+        ["button.btn-secondary", { 
+          style: { marginRight: '0.5rem' },
+          onclick: () => document.getElementById('wim-import-input').click()
+        }, "Import"],
+        ["input#wim-import-input", {
+          type: "file",
+          style: { display: 'none' },
+          onchange: (e) => {
+            if (e.target.files.length > 0) {
+              Results.importData(e.target.files[0]);
+            }
+          }
+        }],
+        ["button.btn-danger", { 
+          style: { marginRight: '0.5rem' },
+          onclick: Results.clear 
+        }, "Clear History"],
+        ["button", { 
+          onclick: Results.toggleEditMode,
+          class: Results.isEditMode ? "btn-secondary" : "btn-primary"
+        }, Results.isEditMode ? "Done" : "Edit"],
+      ]],
       ["h2", "History"],
-      ["button#clearBtn", { onclick: Results.clear }, "Clear History"],
       ["table#resultsTable", [
         ["thead", [
           ["tr", [
@@ -64,12 +139,29 @@ const Results = {
             ["th", "Round 1"],
             ["th", "Round 2"],
             ["th", "Round 3"],
+            Results.isEditMode ? ["th", "Actions"] : null,
           ]]
         ]],
-        ["tbody", Results.data.slice().reverse().map(result => {
-          return ["tr", [
+        ["tbody", Results.data.slice().reverse().map((result, revIndex) => {
+          const actualIndex = Results.data.length - 1 - revIndex;
+          return ["tr", { key: `result-${actualIndex}` }, [
             ["td", result.date],
-            result.rounds.map(round => ["td", round])
+            [0, 1, 2].map(rIndex => ["td", [
+              ["div", {
+                contenteditable: Results.isEditMode,
+                oninput: (e) => {
+                  result.rounds[rIndex] = e.target.textContent;
+                  Results.save();
+                },
+                oncreate: (vnode) => vnode.dom.textContent = result.rounds[rIndex] || ""
+              }]
+            ]]),
+            Results.isEditMode ? ["td", [
+              ["button.btn-danger", { 
+                style: { padding: '0.2rem 0.5rem', fontSize: '0.8rem' },
+                onclick: () => Results.delete(actualIndex) 
+              }, "Delete"]
+            ]] : null
           ]];
         })],
       ]],
@@ -212,15 +304,15 @@ const Timer = {
       ["p.round-indicator", `Round ${Timer.currentRound}`],
       ["span#timer.timer-display", formatTime(Timer.seconds)],
       ["nav", [
-        ["button#startBtn", {
+        ["button#startBtn.btn-success", {
           onclick: Timer.start,
           disabled: Timer.isRunning
         }, "Start"],
-        ["button#stopBtn", {
+        ["button#stopBtn.btn-danger", {
           onclick: Timer.stop,
           disabled: !Timer.isRunning
         }, "Stop"],
-        ["button#finishBtn", {
+        ["button#finishBtn.btn-primary", {
           onclick: Timer.finish
         }, "Finish"]
       ]]

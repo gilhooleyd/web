@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gratitude Journal</title>
+    <link rel="stylesheet" href="/libs/tacit-css.css"/>
+    <link rel="stylesheet" href="/common/style.css"/>
+    <style>
+    .top-right {
+      position: absolute;
+      top: .5rem;
+      right: .5rem;
+      margin: 0;
+    }
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 0.5rem;
+      font-family: inherit;
+    }
+    .entries-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+      justify-content: center;
+      align-items: start;
+    }
+    .post-it {
+      width: 240px;
+      min-height: 240px;
+      padding: 1.5rem 1rem 1rem 1rem;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      border-width: 1px;
+      border-style: solid;
+      transition: transform 0.2s;
+      text-align: center;
+    }
+    .color-0 { background-color: #fff9c4; border-color: #f0e68c; --label-color: #9e9d24; } /* Yellow */
+    .color-1 { background-color: #ffe0b2; border-color: #ffcc80; --label-color: #e65100; } /* Orange */
+    .color-2 { background-color: #c8e6c9; border-color: #a5d6a7; --label-color: #2e7d32; } /* Green */
+    .color-3 { background-color: #bbdefb; border-color: #90caf9; --label-color: #1565c0; } /* Blue */
+    .color-4 { background-color: #e1bee7; border-color: #ce93d8; --label-color: #7b1fa2; } /* Purple */
+    
+    .post-it:hover {
+      transform: rotate(-1deg);
+    }
+    .post-it::before {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 25px;
+      background-color: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .post-it-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+    .entry-number {
+      font-weight: bold;
+      color: var(--label-color, #9e9d24);
+      font-size: 1.2rem;
+      display: block;
+      margin-bottom: 0.5rem;
+      flex-shrink: 0;
+    }
+    section {
+      position: relative;
+    }
+    .entry-text {
+      font-size: 1.4rem;
+      line-height: 1.4;
+      font-family: "Comic Sans MS", "Comic Sans", cursive;
+      color: #333;
+      text-align: center;
+      width: 100%;
+      word-wrap: break-word;
+      margin: 0;
+    }
+    .post-it div.entry-text {
+      background: transparent !important;
+      border: none !important;
+      height: auto;
+      min-height: 1.4em;
+      padding: 0;
+      margin: 0;
+      outline: none;
+      display: inline-block;
+    }
+    .post-it div.entry-text[contenteditable="true"]:empty:before {
+      content: attr(data-placeholder);
+      color: #888;
+    }
+    .input-area {
+      margin-bottom: 3rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .input-grid {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    .entry-actions {
+      margin-top: 0.5rem;
+      display: flex;
+      justify-content: center;
+    }
+    .btn-success {
+      margin-bottom: 1rem;
+    }
+    button.btn-danger {
+      padding: 0.2rem 0.5rem;
+      font-size: 0.7rem;
+    }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <h1>Gratitude Journal</h1>
+    </nav>
+
+    <main id="app-mount"></main>
+
+  </body>
+  <script src="/libs/mithril.js"></script>
+  <script src="script.js"></script>
+</html>

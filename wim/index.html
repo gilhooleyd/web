@@ -4,34 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wim Hof Breathing Timer</title>
-    <link rel="stylesheet" href="tacit-css.css"/>
+    <link rel="stylesheet" href="/libs/tacit-css.css"/>
+    <link rel="stylesheet" href="/common/style.css"/>
     <style>
-    h1:first-child, h2:first-child {
-      margin-top: 0;
-      color: #0066cc;
-    }
-    body {
-      background-color: #f0f8ff;
-    }
-    section {
-      background-color: white;
-      margin-bottom: 2rem;
-      padding: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
     .video-container {
-      position: relative;
-      width: 50%;
+      width: 70%;
       margin: 0 auto 1rem auto;
-      padding-bottom: 28.125%; /* 50% of 56.25% to maintain 16:9 for half width */
-      height: 0;
-      overflow: hidden;
+      aspect-ratio: 16 / 9;
     }
     .video-container iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
       width: 100%;
       height: 100%;
     }
@@ -111,22 +92,14 @@
     .heatmap-day.active {
       background-color: #4CAF50;
     }
-    #startBtn {
-      background-color: #4CAF50;
-      color: white;
+    .top-right {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      margin: 0;
     }
-    #stopBtn {
-      background-color: #f44336;
-      color: white;
-    }
-    #finishBtn {
-      background-color: #2196F3;
-      color: white;
-    }
-    button:disabled {
-      background-color: #cccccc !important;
-      color: #666;
-      cursor: not-allowed;
+    section {
+      position: relative;
     }
     </style>
   </head>
@@ -134,15 +107,16 @@
     <nav>
       <h1>Wim Hof Breathing Timer</h1>
     </nav>
-    <div class="video-container">
-      <iframe src="https://www.youtube.com/embed/tybOi4hjZFQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    <div class="container">
+      <div class="video-container">
+        <iframe src="https://www.youtube.com/embed/tybOi4hjZFQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      </div>
+
+      <div id="timer-mount"></div>
+      <div id="heatmap-mount"></div>
+      <div id="results-mount"></div>
     </div>
-
-    <div id="timer-mount"></div>
-    <div id="heatmap-mount"></div>
-    <div id="results-mount"></div>
-
   </body>
-  <script src="mithril.js"></script>
+  <script src="/libs/mithril.js"></script>
   <script src="script.js"></script>
 </html>
