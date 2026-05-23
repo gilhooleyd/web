@@ -2,13 +2,57 @@
 const GratitudeModel = {
   entries: [],
   isEditMode: false,
+  fileHandle: null,
+  fileKey: "gratitude",
 
-  load: () => {
-    GratitudeModel.entries = JSON.parse(localStorage.getItem('gratitudeEntries') || '[]');
+  load: async () => {
+    // First check if we have a linked file
+    GratitudeModel.fileHandle = await LocalFileLinker.getStoredHandle(GratitudeModel.fileKey);
+    if (GratitudeModel.fileHandle) {
+        await GratitudeModel.loadFileFromHandle();
+    }
+    m.redraw();
   },
 
-  save: () => {
-    localStorage.setItem('gratitudeEntries', JSON.stringify(GratitudeModel.entries));
+  loadFileFromHandle: async () => {
+    const granted = await GratitudeModel.fileHandle.verifyPermission(true);
+    if (!granted) {
+      console.warn('Failed to grant permission');
+      return;
+    }
+    const data = await GratitudeModel.fileHandle.read();
+    if (!Array.isArray(data)) {
+      console.warn('Linked file structure is invalid');
+      await GratitudeModel.unlinkFile();
+      return;
+    }
+    GratitudeModel.entries = data;
+  },
+
+  linkFile: async () => {
+    const file = await LocalFileLinker.pickAndLinkFile(GratitudeModel.fileKey);
+    if (!file) {
+      console.warn('Failed to pickAndLinkFile');
+      return;
+    }
+    GratitudeModel.fileHandle = file;
+    await GratitudeModel.loadFileFromHandle();
+    m.redraw();
+  },
+
+
+  unlinkFile: async () => {
+    if (GratitudeModel.fileHandle) {
+      await GratitudeModel.fileHandle.clear();
+    }
+    GratitudeModel.fileHandle = null;
+    m.redraw();
+  },
+
+  save: async () => {
+    if (GratitudeModel.fileHandle) {
+      await GratitudeModel.fileHandle.write(GratitudeModel.entries);
+    }
   },
 
   add: (text) => {
@@ -46,29 +90,9 @@ const GratitudeModel = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gratitude-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `gratitude-data.json`;
     a.click();
     URL.revokeObjectURL(url);
-  },
-
-  importData: (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (Array.isArray(imported)) {
-          GratitudeModel.entries = imported;
-          GratitudeModel.save();
-          m.redraw();
-          alert('Import successful!');
-        } else {
-          alert('Invalid file format. Expected an array of entries.');
-        }
-      } catch (err) {
-        alert('Error parsing JSON file.');
-      }
-    };
-    reader.readAsText(file);
   },
 
   getPastEntry: (daysAgo) => {
@@ -166,14 +190,25 @@ const App = {
       ["section", [
         ["h2", "Recent Gratitudes"],
         [".top-right", [
+          // Link File Status Button
+          (() => {
+            if (!GratitudeModel.fileHandle) {
+              return ["button.btn-secondary", {
+                style: { marginRight: '0.5rem' },
+                onclick: GratitudeModel.linkFile
+              }, "Link File"];
+            } else {
+              return ["button.btn-secondary", {
+                style: { marginRight: '0.5rem', backgroundColor: '#d4edda', borderColor: '#c3e6cb', color: '#155724' },
+                title: 'Linked to local file. Click to unlink.',
+                onclick: GratitudeModel.unlinkFile
+              }, "✓ Linked"];
+            }
+          })(),
           ["button.btn-secondary", { 
             style: { marginRight: '0.5rem' },
             onclick: GratitudeModel.exportData 
-          }, "Export"],
-          ["button.btn-secondary", { 
-            style: { marginRight: '0.5rem' },
-            onclick: () => document.getElementById('import-input').click()
-          }, "Import"],
+          }, "Create File"],
           ["input[type=file]#import-input", {
             style: { display: 'none' },
             onchange: (e) => {
