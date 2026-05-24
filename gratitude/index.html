@@ -130,15 +130,27 @@
       padding: 0.2rem 0.5rem;
       font-size: 0.7rem;
     }
+    .centered-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      text-align: center;
+    }
+    .centered-container .button-group {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .centered-container button {
+      font-size: 1.1rem;
+      padding: 0.75rem 1.5rem;
+    }
     </style>
   </head>
   <body>
-    <nav>
-      <h1>Gratitude Journal</h1>
-    </nav>
-
     <main id="app-mount"></main>
-
   </body>
   <script src="../libs/mithril.js"></script>
   <script src="../common/file-linker.js"></script>

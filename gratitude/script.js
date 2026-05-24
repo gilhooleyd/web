@@ -1,122 +1,77 @@
-// Data Model
-const GratitudeModel = {
-  entries: [],
-  isEditMode: false,
-  fileHandle: null,
-  fileKey: "gratitude",
+class GratitudeModel {
+  constructor(fileHandle, entries) {
+    this.fileHandle = fileHandle;
+    this.entries = entries;
+    this.isEditMode = false;
+  }
 
-  load: async () => {
-    // First check if we have a linked file
-    GratitudeModel.fileHandle = await LocalFileLinker.getStoredHandle(GratitudeModel.fileKey);
-    if (GratitudeModel.fileHandle) {
-        await GratitudeModel.loadFileFromHandle();
-    }
-    m.redraw();
-  },
-
-  loadFileFromHandle: async () => {
-    const granted = await GratitudeModel.fileHandle.verifyPermission(true);
-    if (!granted) {
-      console.warn('Failed to grant permission');
-      return;
-    }
-    const data = await GratitudeModel.fileHandle.read();
-    if (!Array.isArray(data)) {
+  static async create(fileHandle) {
+    const entries = await fileHandle.read();
+    if (!Array.isArray(entries)) {
       console.warn('Linked file structure is invalid');
-      await GratitudeModel.unlinkFile();
-      return;
+      return null;
     }
-    GratitudeModel.entries = data;
-  },
+    return new GratitudeModel(fileHandle, entries);
+  }
 
-  linkFile: async () => {
-    const file = await LocalFileLinker.pickAndLinkFile(GratitudeModel.fileKey);
-    if (!file) {
-      console.warn('Failed to pickAndLinkFile');
-      return;
+  async save() {
+    if (this.fileHandle) {
+      await this.fileHandle.write(this.entries);
     }
-    GratitudeModel.fileHandle = file;
-    await GratitudeModel.loadFileFromHandle();
-    m.redraw();
-  },
+  }
 
-
-  unlinkFile: async () => {
-    if (GratitudeModel.fileHandle) {
-      await GratitudeModel.fileHandle.clear();
-    }
-    GratitudeModel.fileHandle = null;
-    m.redraw();
-  },
-
-  save: async () => {
-    if (GratitudeModel.fileHandle) {
-      await GratitudeModel.fileHandle.write(GratitudeModel.entries);
-    }
-  },
-
-  add: (text) => {
+  add(text) {
     if (!text.trim()) return;
-    const maxId = GratitudeModel.entries.reduce((max, e) => Math.max(max, e.id), 0);
+    const maxId = this.entries.reduce((max, e) => Math.max(max, e.id), 0);
     const newEntry = {
       id: maxId + 1,
       text: text,
       timestamp: new Date().toISOString()
     };
-    GratitudeModel.entries.push(newEntry);
-    GratitudeModel.save();
-  },
+    this.entries.push(newEntry);
+    this.save();
+  }
 
-  update: (id, text) => {
-    const entry = GratitudeModel.entries.find(e => e.id === id);
+  update(id, text) {
+    const entry = this.entries.find(e => e.id === id);
     if (entry) {
       entry.text = text;
-      GratitudeModel.save();
+      this.save();
     }
-  },
+  }
 
-  delete: (id) => {
-    GratitudeModel.entries = GratitudeModel.entries.filter(e => e.id !== id);
-    GratitudeModel.save();
-  },
+  delete(id) {
+    this.entries = this.entries.filter(e => e.id !== id);
+    this.save();
+  }
 
-  toggleEditMode: () => {
-    GratitudeModel.isEditMode = !GratitudeModel.isEditMode;
-  },
+  toggleEditMode() {
+    this.isEditMode = !this.isEditMode;
+    m.redraw();
+  }
 
-  exportData: () => {
-    const data = JSON.stringify(GratitudeModel.entries, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `gratitude-data.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  },
-
-  getPastEntry: (daysAgo) => {
+  getPastEntry(daysAgo) {
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() - daysAgo);
     const targetDateString = targetDate.toLocaleDateString();
-    return GratitudeModel.entries.find(e => new Date(e.timestamp).toLocaleDateString() === targetDateString);
-  },
+    return this.entries.find(e => new Date(e.timestamp).toLocaleDateString() === targetDateString);
+  }
 
-  getPastEntryMonths: (monthsAgo) => {
+  getPastEntryMonths(monthsAgo) {
     const targetDate = new Date();
     targetDate.setMonth(targetDate.getMonth() - monthsAgo);
     const targetDateString = targetDate.toLocaleDateString();
-    return GratitudeModel.entries.find(e => new Date(e.timestamp).toLocaleDateString() === targetDateString);
-  },
+    return this.entries.find(e => new Date(e.timestamp).toLocaleDateString() === targetDateString);
+  }
 
-  getPastEntryYears: (yearsAgo) => {
+  getPastEntryYears(yearsAgo) {
     const targetDate = new Date();
     targetDate.setFullYear(targetDate.getFullYear() - yearsAgo);
     const targetDateString = targetDate.toLocaleDateString();
-    return GratitudeModel.entries.find(e => new Date(e.timestamp).toLocaleDateString() === targetDateString);
-  },
+    return this.entries.find(e => new Date(e.timestamp).toLocaleDateString() === targetDateString);
+  }
 
-  getPostItColorClass: (id) => {
+  getPostItColorClass(id) {
     return `color-${id % 5}`;
   }
 };
@@ -124,10 +79,72 @@ const GratitudeModel = {
 // Components
 const App = {
   newEntryText: '',
+  gratitudeModel: null,
+  fileHandle: null,
+  fileKey: "gratitude",
 
-  oninit: GratitudeModel.load,
+  oninit: async () => {
+    App.fileHandle = await LocalFileLinker.getStoredHandle(App.fileKey);
+    m.redraw();
+  },
+
+  loadFile: async () => {
+    const granted = await App.fileHandle.verifyPermission(true);
+    if (!granted) {
+      console.warn('Failed to grant permission');
+      return false;
+    }
+
+    App.gratitudeModel = await GratitudeModel.create(App.fileHandle);
+    m.redraw();
+  },
+
+  linkFile: async () => {
+    const file = await LocalFileLinker.pickAndLinkFile(App.fileKey);
+    if (!file) {
+      console.warn('Failed to pickAndLinkFile');
+      return;
+    }
+    App.fileHandle = file;
+    App.loadFile();
+  },
+
+
+  createFile: async () => {
+    const file = await LocalFileLinker.createAndLinkFile('gratitude-data.json', App.fileKey);
+    if (!file) {
+      console.warn('Failed to createAndLinkFile');
+      return;
+    }
+    await file.write([]);
+    App.fileHandle = file;
+    App.loadFile();
+  },
+
+  unlinkFile: async () => {
+    if (App.fileHandle) {
+      await App.fileHandle.clear();
+    }
+    App.fileHandle = null;
+    App.gratitudeModel = null;
+    m.redraw();
+  },
 
   view: () => {
+    if (!App.gratitudeModel) {
+      return h(["div.container.centered-container", [
+        ["h1", "Gratitude Journal"],
+        App.fileHandle ?
+          ["button.btn-primary", { onclick: App.loadFile }, "Open"] :
+          [".button-group", [
+            ["button.btn-primary", { onclick: App.linkFile }, "Link File"],
+            ["button.btn-secondary", { onclick: App.createFile }, "Create File"]
+          ]]
+      ]]);
+    }
+
+    let GratitudeModel = App.gratitudeModel;
+
     const sortedEntries = [...GratitudeModel.entries].sort((a, b) => b.id - a.id);
     const nextId = GratitudeModel.entries.reduce((max, e) => Math.max(max, e.id), 0) + 1;
     const reminders = [
@@ -138,6 +155,9 @@ const App = {
     ].filter(r => r.entry);
 
     return h(["div.container", [
+      ["nav", [
+        ["h1", "Gratitude Journal"]
+      ]],
       ["div.input-area", [
         [".input-grid", [
           [".post-it.input-post-it", {
@@ -200,15 +220,11 @@ const App = {
             } else {
               return ["button.btn-secondary", {
                 style: { marginRight: '0.5rem', backgroundColor: '#d4edda', borderColor: '#c3e6cb', color: '#155724' },
-                title: 'Linked to local file. Click to unlink.',
-                onclick: GratitudeModel.unlinkFile
+                title: `Linked to: ${GratitudeModel.fileHandle.fileHandle.name}. Click to unlink.`,
+                onclick: App.unlinkFile
               }, "✓ Linked"];
             }
           })(),
-          ["button.btn-secondary", { 
-            style: { marginRight: '0.5rem' },
-            onclick: GratitudeModel.exportData 
-          }, "Create File"],
           ["input[type=file]#import-input", {
             style: { display: 'none' },
             onchange: (e) => {
@@ -218,7 +234,7 @@ const App = {
             }
           }],
           ["button.edit-mode-toggle", { 
-            onclick: GratitudeModel.toggleEditMode,
+            onclick: () => {GratitudeModel.toggleEditMode()},
             class: GratitudeModel.isEditMode ? "btn-secondary" : "btn-primary"
           }, GratitudeModel.isEditMode ? "Done Editing" : "Edit"],
         ]],
@@ -252,6 +268,4 @@ const App = {
   }
 };
 
-// Initialization
-GratitudeModel.load();
 m.mount(document.getElementById('app-mount'), App);
