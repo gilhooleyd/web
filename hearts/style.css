@@ -1,0 +1,555 @@
+/* Hearts Card Game Stylesheet */
+/* Inspired by Balatro style card physics and springiness */
+
+:root {
+  --card-width: 110px;
+  --card-height: 160px;
+  --card-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+  --card-shadow-hover: 0 20px 30px rgba(0, 0, 0, 0.4);
+  --card-shadow-selected: 0 0 15px #ffeb3b, 0 8px 16px rgba(255, 235, 59, 0.4);
+  --spring-bezier: cubic-bezier(0.175, 0.885, 0.32, 1.375);
+}
+
+body {
+  background-color: #1e392a; /* Dark felt green poker table */
+  background-image: radial-gradient(circle, #264d36 0%, #14261c 100%);
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+#app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  justify-content: space-between;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* Table Layout */
+.card-table {
+  position: relative;
+  flex-grow: 1;
+  display: grid;
+  grid-template-areas:
+    ". north ."
+    "west center east"
+    ". south .";
+  grid-template-rows: auto 1fr auto; /* Dynamically fit players, center absorbs rest */
+  grid-template-columns: 1.2fr 2fr 1.2fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: center;
+  justify-items: center;
+  perspective: 1200px;
+}
+
+/* Player Zones */
+.player-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.player-zone.active {
+  text-shadow: 0 0 10px rgba(255, 235, 59, 0.8);
+}
+
+.player-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  background: rgba(0,0,0,0.5);
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-score {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
+/* Circular alignment adjustments */
+.zone-north {
+  grid-area: north;
+  pointer-events: none;
+}
+.zone-west {
+  grid-area: west;
+  transform: rotate(90deg);
+  pointer-events: none;
+}
+.zone-east {
+  grid-area: east;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.zone-south {
+  grid-area: south;
+  align-self: end;
+  z-index: 10;
+}
+
+/* Hand layout with fanning */
+.hand {
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  height: var(--card-height);
+  position: relative;
+  padding: 0 1rem;
+}
+
+/* Compact layout for facedown AI hands to prevent overflowing the screen */
+.hand:not(.hand-fanned) {
+  display: flex;
+  width: auto;
+  max-width: 200px;
+  height: 100px !important; /* Scale down container height */
+}
+
+.hand:not(.hand-fanned) .card-wrapper {
+  margin-left: -60px; /* Adjust overlap for narrower cards */
+  width: 70px !important;
+  min-width: 70px !important;
+  height: 100px !important;
+}
+
+.hand:not(.hand-fanned) .card-wrapper:first-child {
+  margin-left: 0 !important;
+}
+
+.hand:not(.hand-fanned) .card {
+  width: 70px !important;
+  min-width: 70px !important;
+  height: 100px !important;
+  min-height: 100px !important;
+  box-shadow: -2px 0 5px rgba(0,0,0,0.15);
+  border-radius: 6px; /* Slightly smaller border radius for smaller cards */
+}
+
+/* Center Board (Trick Area) */
+.center-board {
+  grid-area: center;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  border: 2px dashed rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+/* Played Cards in Trick - Shrunk to fit vertical screen limits */
+.played-cards-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.played-card-slot {
+  position: absolute;
+  width: var(--card-width);
+  height: var(--card-height);
+  will-change: transform, opacity;
+}
+
+/* Entry animations flying cards from players' hand positions to the center */
+@keyframes playFromSouth {
+  0% {
+    transform: translateY(260px) scale(0.75) rotate(-10deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(30px) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes playFromNorth {
+  0% {
+    transform: translateY(-260px) scale(0.75) rotate(170deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(-30px) scale(1) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes playFromWest {
+  0% {
+    transform: translateX(-260px) scale(0.75) rotate(80deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-30px) scale(1) rotate(90deg);
+    opacity: 1;
+  }
+}
+
+@keyframes playFromEast {
+  0% {
+    transform: translateX(260px) scale(0.75) rotate(-100deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(30px) scale(1) rotate(-90deg);
+    opacity: 1;
+  }
+}
+
+/* Apply dynamic entry animations on load */
+.slot-south {
+  animation: playFromSouth 0.45s var(--spring-bezier) forwards;
+  z-index: 4;
+}
+.slot-north {
+  animation: playFromNorth 0.45s var(--spring-bezier) forwards;
+  z-index: 2;
+}
+.slot-west {
+  animation: playFromWest 0.45s var(--spring-bezier) forwards;
+  z-index: 1;
+}
+.slot-east {
+  animation: playFromEast 0.45s var(--spring-bezier) forwards;
+  z-index: 3;
+}
+
+/* Exit animations: fly cards towards the trick winner and fade out */
+.collect-to-south .played-card-slot {
+  transform: translateY(300px) scale(0.1) rotate(10deg) !important;
+  opacity: 0 !important;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease !important;
+}
+
+.collect-to-north .played-card-slot {
+  transform: translateY(-300px) scale(0.1) rotate(190deg) !important;
+  opacity: 0 !important;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease !important;
+}
+
+.collect-to-west .played-card-slot {
+  transform: translateX(-300px) scale(0.1) rotate(100deg) !important;
+  opacity: 0 !important;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease !important;
+}
+
+.collect-to-east .played-card-slot {
+  transform: translateX(300px) scale(0.1) rotate(-80deg) !important;
+  opacity: 0 !important;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease !important;
+}
+
+/* Standard Card Base styling */
+.card {
+  position: relative;
+  width: var(--card-width) !important;
+  min-width: var(--card-width) !important;
+  height: var(--card-height) !important;
+  min-height: var(--card-height) !important;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+  color: #000;
+  transition:
+    transform 0.4s var(--spring-bezier),
+    box-shadow 0.4s var(--spring-bezier),
+    z-index 0s;
+  transform-style: preserve-3d;
+  will-change: transform;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+  box-sizing: border-box;
+  border: 2px solid #222;
+  flex-shrink: 0 !important;
+}
+
+/* Continuous Balatro floating sway */
+@keyframes cardFloat {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-2px) rotate(0.5deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(2px) rotate(-0.5deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.hand .card {
+  animation: cardFloat 4s ease-in-out infinite;
+  animation-delay: calc(var(--index) * -0.3s);
+}
+
+/* Fanned hand wrapper layout math */
+.hand-fanned .card-wrapper {
+  position: absolute;
+  --offset: calc(var(--index) - (var(--total-cards) - 1) / 2);
+  --rotate-val: calc(var(--offset) * 4deg);
+  --translate-y-val: calc(abs(var(--offset)) * 3px);
+
+  /* Position the card's left edge exactly so it centers horizontally */
+  left: calc(50% - var(--card-width) / 2);
+  transform:
+    translateX(calc(var(--offset) * 38px))
+    translateY(var(--translate-y-val))
+    rotate(var(--rotate-val));
+  
+  z-index: var(--index);
+  transition: transform 0.4s var(--spring-bezier);
+  height: var(--card-height) !important;
+  width: var(--card-width) !important;
+  min-width: var(--card-width) !important;
+  flex-shrink: 0 !important;
+}
+
+/* Selected wrapper for card passing state */
+.hand-fanned .card-wrapper.selected {
+  transform:
+    translateX(calc(var(--offset) * 38px))
+    translateY(-65px) /* Raised higher up as requested */
+    rotate(calc(var(--offset) * 2deg)) !important;
+  z-index: 100 !important;
+}
+
+/* Disable hover-helper click interception when a card is already selected */
+.hand-fanned .card-wrapper.selected::before {
+  pointer-events: none !important;
+  display: none !important;
+}
+
+/* Prevent hover flickering: transparent zone underneath wrapper keeps hover steady */
+.hand-fanned .card-wrapper::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: -60px;
+  pointer-events: auto;
+  z-index: -1;
+}
+
+/* Card hover effect - Compound transformation on top of fanning */
+.hand-fanned .card-wrapper .card {
+  transition: transform 0.3s var(--spring-bezier), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.hand-fanned .card-wrapper .card:hover {
+  transform:
+    translateY(-25px)
+    scale(1.18)
+    rotateX(var(--tilt-y, 0deg))
+    rotateY(calc(10deg + var(--tilt-x, 0deg))) !important;
+  box-shadow: var(--card-shadow-hover);
+  animation: none; /* Pause general float on hover */
+}
+
+.hand-fanned .card-wrapper.selected .card {
+  box-shadow: var(--card-shadow-selected);
+  border: 3px solid #ffd54f;
+  animation: none;
+}
+
+/* Back of card style */
+.card.back {
+  background: repeating-linear-gradient(
+    45deg,
+    #b71c1c,
+    #b71c1c 10px,
+    #d32f2f 10px,
+    #d32f2f 20px
+  );
+  border: 3px solid #fff;
+  box-shadow: var(--card-shadow);
+}
+
+.card.back::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border: 2px dashed rgba(255,255,255,0.4);
+  border-radius: 6px;
+}
+
+/* Card interior layouts */
+.card-value-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 1.4rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.card-suit-center {
+  align-self: center;
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.card-value-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 1.4rem;
+  font-weight: 900;
+  line-height: 1;
+  transform: rotate(180deg);
+}
+
+/* Suit colors */
+.suit-hearts, .suit-diamonds {
+  color: #e53935; /* Vibrant red */
+}
+
+.suit-spades, .suit-clubs {
+  color: #1e293b; /* Dark slate black */
+}
+
+/* Menacing Queen of Spades custom design */
+.card.queen-of-spades {
+  background: #faf5ff;
+  border: 2px solid #7e22ce;
+  box-shadow: 0 6px 15px rgba(126, 34, 206, 0.3);
+}
+.card.queen-of-spades:hover {
+  box-shadow: 0 20px 35px rgba(126, 34, 206, 0.6);
+}
+.card.queen-of-spades .card-suit-center {
+  color: #7e22ce !important; /* Regal Purple for the Queen of Spades */
+  text-shadow: 0 0 8px rgba(126, 34, 206, 0.4);
+}
+
+/* Scoreboard & Control Panel */
+.hud-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.85); /* Darker backdrop for contrast */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 14px 28px;
+  margin-top: auto;
+  backdrop-filter: blur(15px);
+  z-index: 100;
+}
+
+.hud-left {
+  width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.hud-middle {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.hud-right {
+  width: 25%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.hud-message-text {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #ffeb3b !important; /* Energetic yellow status text */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.hud-pass-counter {
+  font-size: 0.9rem;
+  color: #fff !important;
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 12px;
+  border-radius: 12px;
+}
+
+.direction-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  color: #a78bfa; /* Cool lilac purple passing indicator */
+}
+
+/* Buttons & controls */
+button.pass-btn, button.action-btn {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  color: white !important;
+  border: none;
+  padding: 8px 20px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(245, 124, 0, 0.3);
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+
+button.pass-btn:hover, button.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(245, 124, 0, 0.5);
+}
+
+button.pass-btn:active, button.action-btn:active {
+  transform: translateY(1px);
+}
+
+button.pass-btn:disabled {
+  background: #475569;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
