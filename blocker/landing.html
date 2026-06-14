@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Website Blocked</title>
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <div class="container">
+    <h1 id="blocked-title" class="warning-title">Website Blocked</h1>
+    <p id="status-message">You have reached your limit for this website today.</p>
+    
+    <div class="stats-summary">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-attempts">-</div>
+        <div class="stat-label">Access Attempts Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-time-spent">-</div>
+        <div class="stat-label">Time Spent Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-time-limit">-</div>
+        <div class="stat-label">Daily Limit</div>
+      </div>
+    </div>
+
+    <div class="stats-summary historical-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-all-time">-</div>
+        <div class="stat-label">All Time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-last-month">-</div>
+        <div class="stat-label">Last Month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-last-year">-</div>
+        <div class="stat-label">Last Year</div>
+      </div>
+    </div>
+
+    <h2>Weekly Usage</h2>
+    <div id="weekly-chart" class="weekly-chart"></div>
+
+    <h2>Yearly Activity</h2>
+    <div class="heatmap-container">
+      <div id="heatmap" class="heatmap"></div>
+    </div>
+
+    <div class="bypass-container" id="bypass-container">
+      <!-- Will be populated by JS -->
+    </div>
+  </div>
+  <script src="utils.js"></script>
+  <script src="landing.js"></script>
+</body>
+</html>

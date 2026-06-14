@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Web Blocker",
+  "version": "1.0",
+  "description": "Limit time spent on specific websites.",
+  "permissions": [
+    "storage",
+    "webNavigation",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["utils.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Web Blocker"
+  }
+}
