@@ -397,7 +397,7 @@ const App = {
     return h(["div.container", [
       // Header
       ["div.nav-container", [
-        ["h1", "🍅 Pomodoro Dashboard"],
+        ["h1", "Pomodoro Dashboard"],
         ["div", [
           ["button", {
             style: { backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold', marginRight: '0.5rem' },
@@ -415,7 +415,6 @@ const App = {
       ["div.timer-dashboard", [
         // Timer Card
         ["div.timer-card", [
-          ["h3", App.timerState === 'running' ? "Focusing..." : "Ready to Focus?"],
           ["div.timer-display", App.formatTime(App.timeLeft)],
           
           ["div.timer-controls", [
@@ -440,13 +439,10 @@ const App = {
 
         // Form Input Card
         ["div.form-card", [
-          ["h3", "Active Session Details"],
-          
           ["div.form-row", { style: { display: 'flex', gap: '1rem', marginBottom: '1.25rem' } }, [
             ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
-              ["label", "Project"],
               ["input[type=text]", {
-                placeholder: "e.g. Personal, Work, Research",
+                placeholder: "Project",
                 value: App.project,
                 list: "projects-list",
                 oninput: (e) => App.project = e.target.value
@@ -454,31 +450,27 @@ const App = {
               ["datalist#projects-list", pm.projects.map(p => ["option", { value: p }])]
             ]],
             ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
-              ["label", "Tags"],
               ["input[type=text]", {
-                placeholder: "e.g. writing, coding, design",
+                placeholder: "Tags",
                 value: App.tagsString,
                 list: "tags-list",
                 oninput: (e) => App.tagsString = e.target.value
               }],
               ["datalist#tags-list", pm.tags.map(t => ["option", { value: t }])],
-              ["div.form-help", "Comma-separated tags."]
             ]]
           ]],
 
           ["div.form-group", [
-            ["label", "Title"],
             ["input[type=text]", {
-              placeholder: "What are you working on?",
+              placeholder: "Title",
               value: App.title,
               oninput: (e) => App.title = e.target.value
             }]
           ]],
 
           ["div.form-group", [
-            ["label", "Notes / Description (Markdown supported)"],
             ["textarea", {
-              placeholder: "Summarize what you accomplished or want to track...",
+              placeholder: "Notes (Markdown supported)",
               value: App.info,
               oninput: (e) => App.info = e.target.value
             }]
