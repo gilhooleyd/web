@@ -158,12 +158,9 @@ const App = {
   showCompletionModal: false,
   showStatsSidebar: false,
 
-  // Inline Edit States
-  editingPomStarted: null,
-  editTitle: '',
-  editProject: '',
-  editTagsString: '',
-  editInfo: '',
+  // Bulk Edit States
+  isEditingAll: false,
+  editStates: {},
 
   // Init
   oninit: async () => {
@@ -298,32 +295,32 @@ const App = {
     m.redraw();
   },
 
-  // Inline Editing Methods
-  startEdit: (p) => {
-    App.editingPomStarted = p.started;
-    App.editTitle = p.title;
-    App.editProject = p.project || 'General';
-    App.editTagsString = (p.tags || []).join(', ');
-    App.editInfo = p.info || '';
+  // Bulk Editing Methods
+  startBulkEdit: (filteredPoms) => {
+    App.isEditingAll = true;
+    App.editStates = {};
+    filteredPoms.forEach(p => {
+      App.editStates[p.started] = {
+        title: p.title,
+        project: p.project || 'General',
+        tagsString: (p.tags || []).join(', '),
+        info: p.info || ''
+      };
+    });
     m.redraw();
   },
 
-  cancelEdit: () => {
-    App.editingPomStarted = null;
-    m.redraw();
-  },
-
-  saveEdit: (startedTime) => {
-    if (App.pomodoroModel) {
-      const p = App.pomodoroModel.data.find(item => item.started === startedTime);
-      if (p) {
-        p.title = App.editTitle.trim() || 'Unnamed Pomodoro';
-        p.project = App.editProject.trim() || 'General';
-        p.tags = App.editTagsString
+  saveBulkEdit: () => {
+    App.pomodoroModel.data.forEach(p => {
+      const editState = App.editStates[p.started];
+      if (editState) {
+        p.title = editState.title.trim() || 'Unnamed Pomodoro';
+        p.project = editState.project.trim() || 'General';
+        p.tags = editState.tagsString
           .split(',')
           .map(t => t.trim())
           .filter(t => t !== '');
-        p.info = App.editInfo.trim();
+        p.info = editState.info.trim();
         
         // Update Autocompletes if new
         if (p.project && !App.pomodoroModel.projects.includes(p.project)) {
@@ -334,12 +331,19 @@ const App = {
             App.pomodoroModel.tags.push(tag);
           }
         });
-
-        App.pomodoroModel.save();
       }
-    }
-    App.editingPomStarted = null;
+    });
+    App.pomodoroModel.save();
+    App.isEditingAll = false;
+    App.editStates = {};
     m.redraw();
+  },
+
+  deleteDuringBulkEdit: (startedTime) => {
+    if (confirm("Are you sure you want to delete this focus log?")) {
+      App.pomodoroModel.delete(startedTime);
+      delete App.editStates[startedTime];
+    }
   },
 
   // Render Helper
@@ -418,8 +422,11 @@ const App = {
             App.timerState === 'running' ?
               ["button.btn-warning", { onclick: App.pauseTimer }, "Pause"] :
               ["button.btn-success", { onclick: App.startTimer }, "Start"],
-            App.timerState !== 'idle' ?
-              ["button.btn-success", { onclick: App.completeTimer, style: { marginLeft: '0.5rem', marginRight: '0.5rem' } }, "Finish"] : null,
+            ["button.btn-success", {
+              onclick: App.completeTimer,
+              disabled: App.timerState === 'idle',
+              style: { marginLeft: '0.5rem', marginRight: '0.5rem' }
+            }, "Finish"],
             ["button.btn-danger", { onclick: App.resetTimer }, "Reset"]
           ]],
 
@@ -435,6 +442,30 @@ const App = {
         ["div.form-card", [
           ["h3", "Active Session Details"],
           
+          ["div.form-row", { style: { display: 'flex', gap: '1rem', marginBottom: '1.25rem' } }, [
+            ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
+              ["label", "Project"],
+              ["input[type=text]", {
+                placeholder: "e.g. Personal, Work, Research",
+                value: App.project,
+                list: "projects-list",
+                oninput: (e) => App.project = e.target.value
+              }],
+              ["datalist#projects-list", pm.projects.map(p => ["option", { value: p }])]
+            ]],
+            ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
+              ["label", "Tags"],
+              ["input[type=text]", {
+                placeholder: "e.g. writing, coding, design",
+                value: App.tagsString,
+                list: "tags-list",
+                oninput: (e) => App.tagsString = e.target.value
+              }],
+              ["datalist#tags-list", pm.tags.map(t => ["option", { value: t }])],
+              ["div.form-help", "Comma-separated tags."]
+            ]]
+          ]],
+
           ["div.form-group", [
             ["label", "Title"],
             ["input[type=text]", {
@@ -442,29 +473,6 @@ const App = {
               value: App.title,
               oninput: (e) => App.title = e.target.value
             }]
-          ]],
-
-          ["div.form-group", [
-            ["label", "Project"],
-            ["input[type=text]", {
-              placeholder: "e.g. Personal, Work, Research",
-              value: App.project,
-              list: "projects-list",
-              oninput: (e) => App.project = e.target.value
-            }],
-            ["datalist#projects-list", pm.projects.map(p => ["option", { value: p }])]
-          ]],
-
-          ["div.form-group", [
-            ["label", "Tags"],
-            ["input[type=text]", {
-              placeholder: "e.g. writing, coding, design",
-              value: App.tagsString,
-              list: "tags-list",
-              oninput: (e) => App.tagsString = e.target.value
-            }],
-            ["datalist#tags-list", pm.tags.map(t => ["option", { value: t }])],
-            ["div.form-help", "Comma-separated list of tags."]
           ]],
 
           ["div.form-group", [
@@ -483,7 +491,14 @@ const App = {
       // Grouped Completed Sessions Feed
       ["div.feed-section", [
         ["div.feed-header", [
-          ["h2", `Completed Sessions (${filteredPomodoros.length})`],
+          ["div", { style: { display: 'flex', alignItems: 'center', gap: '1rem' } }, [
+            ["h2", `Completed Sessions (${filteredPomodoros.length})`],
+            filteredPomodoros.length > 0 ? (
+              App.isEditingAll ?
+                ["button.btn-success", { onclick: App.saveBulkEdit }, "Save Changes"] :
+                ["button", { onclick: () => App.startBulkEdit(filteredPomodoros) }, "Edit All"]
+            ) : null
+          ]],
           
           ["div.filter-controls", [
             // Project Filter
@@ -530,74 +545,62 @@ const App = {
           order.map(dateKey => {
             const dayPoms = groups[dateKey];
             return ["div.feed-day-group", { key: dateKey }, [
-              ["h3", { key: dateKey + "-header", style: { marginTop: '2.5rem', borderBottom: '2px solid #e53935', paddingBottom: '0.4rem', color: '#e53935', fontSize: '1.2rem' } }, dateKey],
+              ["h3", { key: dateKey + "-header", style: { marginTop: '2.5rem', borderBottom: '2px solid #0066cc', paddingBottom: '0.4rem', color: '#0066cc', fontSize: '1.2rem' } }, dateKey],
               dayPoms.map(p => {
                 const startTime = new Date(p.started).toLocaleTimeString(undefined, {
                   hour: '2-digit', minute: '2-digit'
                 });
 
-                const isEditing = App.editingPomStarted === p.started;
-
-                if (isEditing) {
-                  return ["div.feed-item", { key: p.started, style: { borderLeft: '4px solid #4caf50', background: '#f4fbf6' } }, [
-                    ["h4", { style: { margin: '0 0 1rem 0' } }, "Edit Focus Session"],
-                    ["div.form-group", [
-                      ["label", "Title"],
-                      ["input[type=text]", {
-                        value: App.editTitle,
-                        oninput: (e) => App.editTitle = e.target.value
-                      }]
-                    ]],
-                    ["div.form-group", [
-                      ["label", "Project"],
-                      ["input[type=text]", {
-                        value: App.editProject,
-                        list: "projects-list",
-                        oninput: (e) => App.editProject = e.target.value
-                      }]
-                    ]],
-                    ["div.form-group", [
-                      ["label", "Tags"],
-                      ["input[type=text]", {
-                        value: App.editTagsString,
-                        list: "tags-list",
-                        oninput: (e) => App.editTagsString = e.target.value
-                      }],
-                      ["div.form-help", "Comma-separated list of tags."]
-                    ]],
-                    ["div.form-group", [
-                      ["label", "Notes (Markdown)"],
-                      ["textarea", {
-                        style: { minHeight: '120px' },
-                        value: App.editInfo,
-                        oninput: (e) => App.editInfo = e.target.value
-                      }]
-                    ]],
-                    ["div", { style: { display: 'flex', gap: '0.5rem', marginTop: '1rem' } }, [
-                      ["button.btn-success", { onclick: () => App.saveEdit(p.started) }, "Save"],
-                      ["button.btn-secondary", { onclick: App.cancelEdit }, "Cancel"]
-                    ]]
-                  ]];
+                if (App.isEditingAll) {
+                  const editState = App.editStates[p.started];
+                  if (editState) {
+                    return ["div.feed-item", { key: p.started, style: { borderLeft: '4px solid #0066cc', background: '#f0f8ff' } }, [
+                      ["div.top-right-btn", [
+                        ["button.btn-danger", {
+                          style: { padding: '0.15rem 0.4rem', fontSize: '0.75rem' },
+                          onclick: () => App.deleteDuringBulkEdit(p.started)
+                        }, "Delete"]
+                      ]],
+                      ["h4", { style: { margin: '0 0 1rem 0' } }, `Editing: ${p.dayIndex} - ${startTime}`],
+                      ["div.form-group", [
+                        ["label", "Title"],
+                        ["input[type=text]", {
+                          value: editState.title,
+                          oninput: (e) => editState.title = e.target.value
+                        }]
+                      ]],
+                      ["div.form-row", { style: { display: 'flex', gap: '1rem', marginBottom: '1.25rem' } }, [
+                        ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
+                          ["label", "Project"],
+                          ["input[type=text]", {
+                            value: editState.project,
+                            list: "projects-list",
+                            oninput: (e) => editState.project = e.target.value
+                          }]
+                        ]],
+                        ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
+                          ["label", "Tags"],
+                          ["input[type=text]", {
+                            value: editState.tagsString,
+                            list: "tags-list",
+                            oninput: (e) => editState.tagsString = e.target.value
+                          }]
+                        ]]
+                      ]],
+                      ["div.form-group", [
+                        ["label", "Notes (Markdown)"],
+                        ["textarea", {
+                          style: { minHeight: '80px' },
+                          value: editState.info,
+                          oninput: (e) => editState.info = e.target.value
+                        }]
+                      ]]
+                    ]];
+                  }
                 }
 
                 // Standard item view: Inline tags, pre-fixed absolute count, start time meta.
                 return ["div.feed-item", { key: p.started }, [
-                  // Control buttons
-                  ["div.top-right-btn", [
-                    ["button", {
-                      style: { padding: '0.15rem 0.4rem', fontSize: '0.75rem', marginRight: '0.25rem', backgroundColor: '#4caf50', color: 'white' },
-                      onclick: () => App.startEdit(p)
-                    }, "Edit"],
-                    ["button.btn-danger", {
-                      style: { padding: '0.15rem 0.4rem', fontSize: '0.75rem' },
-                      onclick: () => {
-                        if (confirm("Are you sure you want to delete this focus log?")) {
-                          pm.delete(p.started);
-                        }
-                      }
-                    }, "Delete"]
-                  ]],
-
                   ["div.feed-item-header", [
                     ["h3.feed-item-title", [
                       `${p.dayIndex} - ${startTime} - ${p.title}`,
@@ -657,7 +660,7 @@ const App = {
 
           // Focus Stats Cards
           ["div.stat-summary-card", { style: { marginBottom: '2rem', border: '1px solid #eee', borderRadius: '8px', padding: '1.25rem' } }, [
-            ["h3", { style: { margin: '0 0 1rem 0', color: '#e53935' } }, "Session Summaries"],
+            ["h3", { style: { margin: '0 0 1rem 0', color: '#0066cc' } }, "Session Summaries"],
             ["div.stat-box", [
               ["span", "Total Completed Sessions"],
               ["span.stat-val", stats.total]
@@ -674,7 +677,7 @@ const App = {
 
           // Project breakdown stats table
           ["div.stat-breakdown-card", { style: { border: '1px solid #eee', borderRadius: '8px', padding: '1.25rem' } }, [
-            ["h3", { style: { margin: '0 0 1rem 0', color: '#e53935' } }, "Breakdown By Project"],
+            ["h3", { style: { margin: '0 0 1rem 0', color: '#0066cc' } }, "Breakdown By Project"],
             ["div", { style: { maxHeight: '280px', overflowY: 'auto' } }, [
               ["table.breakdown-table", [
                 ["thead", [
