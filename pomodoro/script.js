@@ -63,7 +63,7 @@ function playAlarm() {
 // Heatmap shared adapter
 function renderHeatmap(pomodoros) {
   if (typeof SharedHeatmap !== 'undefined') {
-    return SharedHeatmap.render(pomodoros, { timestampField: 'started' });
+    return SharedHeatmap.render(pomodoros, { timestampField: 'started', startOfYear: true });
   }
   return ["div", "Heatmap renderer not loaded."];
 }
@@ -156,7 +156,7 @@ const App = {
 
   // UI States
   showCompletionModal: false,
-  showStatsSidebar: false,
+  viewMode: 'list', // 'list' or 'stats'
 
   // Bulk Edit States
   isEditingAll: false,
@@ -235,6 +235,8 @@ const App = {
       const elapsed = Math.floor((Date.now() - App.timerStartTime) / 1000);
       App.timeLeft = Math.max(0, App.timerDuration - elapsed);
       
+      document.title = `${App.formatTime(App.timeLeft)} - Pomodoro Timer`;
+      
       if (App.timeLeft <= 0) {
         App.completeTimer();
       }
@@ -247,6 +249,7 @@ const App = {
     App.timerState = 'paused';
     clearInterval(App.timerInterval);
     App.timerPausedElapsed = Math.floor((Date.now() - App.timerStartTime) / 1000);
+    document.title = "Pomodoro Timer";
     m.redraw();
   },
 
@@ -255,6 +258,7 @@ const App = {
     clearInterval(App.timerInterval);
     App.timerPausedElapsed = 0;
     App.timeLeft = App.timerDuration;
+    document.title = "Pomodoro Timer";
     m.redraw();
   },
 
@@ -263,6 +267,7 @@ const App = {
     clearInterval(App.timerInterval);
     App.timerPausedElapsed = 0;
     App.timeLeft = App.timerDuration;
+    document.title = "Pomodoro Timer";
 
     // Play audio alarm
     playAlarm();
@@ -400,10 +405,6 @@ const App = {
         ["h1", "Pomodoro Dashboard"],
         ["div", [
           ["button", {
-            style: { backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold', marginRight: '0.5rem' },
-            onclick: () => App.showStatsSidebar = true
-          }, "📊 View Stats"],
-          ["button", {
             style: { backgroundColor: '#ffeef0', color: '#d73a49', fontWeight: 'bold' },
             title: `Linked: ${App.fileHandle.fileHandle.name}. Click to unlink.`,
             onclick: App.unlinkFile
@@ -484,15 +485,26 @@ const App = {
       ["div.feed-section", [
         ["div.feed-header", [
           ["div", { style: { display: 'flex', alignItems: 'center', gap: '1rem' } }, [
-            ["h2", `Completed Sessions (${filteredPomodoros.length})`],
-            filteredPomodoros.length > 0 ? (
-              App.isEditingAll ?
-                ["button.btn-success", { onclick: App.saveBulkEdit }, "Save Changes"] :
-                ["button", { onclick: () => App.startBulkEdit(filteredPomodoros) }, "Edit All"]
-            ) : null
+            ["h2", App.viewMode === 'stats' ? "Focus Stats & Insights" : `Completed Sessions (${filteredPomodoros.length})`],
+            App.viewMode === 'list' ? [
+              filteredPomodoros.length > 0 ? (
+                App.isEditingAll ?
+                  ["button.btn-success", { onclick: App.saveBulkEdit }, "Save Changes"] :
+                  ["button", { onclick: () => App.startBulkEdit(filteredPomodoros) }, "Edit All"]
+              ) : null,
+              ["button", {
+                style: { backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold' },
+                onclick: () => App.viewMode = 'stats'
+              }, "📊 View Stats"]
+            ] : [
+              ["button", {
+                style: { backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold' },
+                onclick: () => App.viewMode = 'list'
+              }, "📋 View List"]
+            ]
           ]],
           
-          ["div.filter-controls", [
+          App.viewMode === 'list' ? ["div.filter-controls", [
             // Project Filter
             ["select", {
               value: App.filterProject,
@@ -528,86 +540,140 @@ const App = {
                   App.filterText = '';
                 }
               }, "Clear Filters"] : null
-          ]]
+          ]] : null
         ]],
 
-        // Grouped Feed List
-        ["div.feed-list", order.length === 0 ?
-          [["div.empty-state", "No pomodoros matching the active filters."]] :
-          order.map(dateKey => {
-            const dayPoms = groups[dateKey];
-            return ["div.feed-day-group", { key: dateKey }, [
-              ["h3", { key: dateKey + "-header", style: { marginTop: '2.5rem', borderBottom: '2px solid #0066cc', paddingBottom: '0.4rem', color: '#0066cc', fontSize: '1.2rem' } }, dateKey],
-              dayPoms.map(p => {
-                const startTime = new Date(p.started).toLocaleTimeString(undefined, {
-                  hour: '2-digit', minute: '2-digit'
-                });
+        // Content Area: Stats or Feed List
+        App.viewMode === 'stats' ?
+          ["div.stats-inline-container", { style: { marginTop: '1.5rem' } }, [
+            // Activity Heatmap
+            ["div.heatmap-card", { style: { padding: '1rem', border: '1px solid #eee', borderRadius: '8px', marginBottom: '2rem' } }, [
+              ["div.heatmap-header", [
+                ["h4", { style: { margin: '0 0 0.75rem 0' } }, "Activity Heatmap"]
+              ]],
+              renderHeatmap(pm.data)
+            ]],
 
-                if (App.isEditingAll) {
-                  const editState = App.editStates[p.started];
-                  if (editState) {
-                    return ["div.feed-item", { key: p.started, style: { borderLeft: '4px solid #0066cc', background: '#f0f8ff' } }, [
-                      ["div.top-right-btn", [
-                        ["button.btn-danger", {
-                          style: { padding: '0.15rem 0.4rem', fontSize: '0.75rem' },
-                          onclick: () => App.deleteDuringBulkEdit(p.started)
-                        }, "Delete"]
-                      ]],
-                      ["h4", { style: { margin: '0 0 1rem 0' } }, `Editing: ${p.dayIndex} - ${startTime}`],
-                      ["div.form-group", [
-                        ["label", "Title"],
-                        ["input[type=text]", {
-                          value: editState.title,
-                          oninput: (e) => editState.title = e.target.value
-                        }]
-                      ]],
-                      ["div.form-row", { style: { display: 'flex', gap: '1rem', marginBottom: '1.25rem' } }, [
-                        ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
-                          ["label", "Project"],
+            // Focus Stats Cards
+            ["div.stats-grid", [
+              ["div.stat-summary-card", [
+                ["h3", { style: { margin: '0 0 1rem 0', color: '#0066cc' } }, "Session Summaries"],
+                ["div.stat-box", [
+                  ["span", "Total Completed Sessions"],
+                  ["span.stat-val", stats.total]
+                ]],
+                ["div.stat-box", [
+                  ["span", "This Week's Sessions"],
+                  ["span.stat-val", stats.thisWeek]
+                ]],
+                ["div.stat-box", [
+                  ["span", "Total Focus Time"],
+                  ["span.stat-val", `${stats.total * 25} mins`]
+                ]]
+              ]],
+
+              // Project breakdown stats table
+              ["div.stat-breakdown-card", [
+                ["h3", { style: { margin: '0 0 1rem 0', color: '#0066cc' } }, "Breakdown By Project"],
+                ["div", { style: { maxHeight: '280px', overflowY: 'auto' } }, [
+                  ["table.breakdown-table", [
+                    ["thead", [
+                      ["tr", [
+                        ["th", "Project"],
+                        ["th", "Total Poms"],
+                        ["th", "This Week"]
+                      ]]
+                    ]],
+                    ["tbody", Object.keys(stats.totalByProject).length === 0 ?
+                      [["tr", [["td[colspan=3]", { style: { textAlign: 'center', color: '#999' } }, "No logged pomodoros yet."]]]] :
+                      Object.keys(stats.totalByProject).map(proj => ["tr", [
+                        ["td", proj],
+                        ["td", stats.totalByProject[proj]],
+                        ["td", stats.thisWeekByProject[proj] || 0]
+                      ]])
+                    ]
+                  ]]
+                ]]
+              ]]
+            ]]
+          ]] :
+          // Grouped Feed List
+          ["div.feed-list", order.length === 0 ?
+            [["div.empty-state", "No pomodoros matching the active filters."]] :
+            order.map(dateKey => {
+              const dayPoms = groups[dateKey];
+              return ["div.feed-day-group", { key: dateKey }, [
+                ["h3", { key: dateKey + "-header", style: { marginTop: '2.5rem', borderBottom: '2px solid #0066cc', paddingBottom: '0.4rem', color: '#0066cc', fontSize: '1.2rem' } }, dateKey],
+                dayPoms.map(p => {
+                  const startTime = new Date(p.started).toLocaleTimeString(undefined, {
+                    hour: '2-digit', minute: '2-digit'
+                  });
+
+                  if (App.isEditingAll) {
+                    const editState = App.editStates[p.started];
+                    if (editState) {
+                      return ["div.feed-item", { key: p.started, style: { borderLeft: '4px solid #0066cc', background: '#f0f8ff' } }, [
+                        ["div.top-right-btn", [
+                          ["button.btn-danger", {
+                            style: { padding: '0.15rem 0.4rem', fontSize: '0.75rem' },
+                            onclick: () => App.deleteDuringBulkEdit(p.started)
+                          }, "Delete"]
+                        ]],
+                        ["h4", { style: { margin: '0 0 1rem 0' } }, `Editing: ${p.dayIndex} - ${startTime}`],
+                        ["div.form-group", [
+                          ["label", "Title"],
                           ["input[type=text]", {
-                            value: editState.project,
-                            list: "projects-list",
-                            oninput: (e) => editState.project = e.target.value
+                            value: editState.title,
+                            oninput: (e) => editState.title = e.target.value
                           }]
                         ]],
-                        ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
-                          ["label", "Tags"],
-                          ["input[type=text]", {
-                            value: editState.tagsString,
-                            list: "tags-list",
-                            oninput: (e) => editState.tagsString = e.target.value
+                        ["div.form-row", { style: { display: 'flex', gap: '1rem', marginBottom: '1.25rem' } }, [
+                          ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
+                            ["label", "Project"],
+                            ["input[type=text]", {
+                              value: editState.project,
+                              list: "projects-list",
+                              oninput: (e) => editState.project = e.target.value
+                            }]
+                          ]],
+                          ["div.form-group", { style: { flex: 1, marginBottom: 0 } }, [
+                            ["label", "Tags"],
+                            ["input[type=text]", {
+                              value: editState.tagsString,
+                              list: "tags-list",
+                              oninput: (e) => editState.tagsString = e.target.value
+                            }]
+                          ]]
+                        ]],
+                        ["div.form-group", [
+                          ["label", "Notes (Markdown)"],
+                          ["textarea", {
+                            style: { minHeight: '80px' },
+                            value: editState.info,
+                            oninput: (e) => editState.info = e.target.value
                           }]
                         ]]
-                      ]],
-                      ["div.form-group", [
-                        ["label", "Notes (Markdown)"],
-                        ["textarea", {
-                          style: { minHeight: '80px' },
-                          value: editState.info,
-                          oninput: (e) => editState.info = e.target.value
-                        }]
-                      ]]
-                    ]];
+                      ]];
+                    }
                   }
-                }
 
-                // Standard item view: Inline tags, pre-fixed absolute count, start time meta.
-                return ["div.feed-item", { key: p.started }, [
-                  ["div.feed-item-header", [
-                    ["h3.feed-item-title", [
-                      `${p.dayIndex} - ${startTime} - ${p.title}`,
-                      ["span.badge.badge-project", { style: { marginLeft: '0.75rem', verticalAlign: 'middle' } }, p.project || 'General'],
-                      (p.tags || []).map(tag => ["span.badge.badge-tag", { style: { marginLeft: '0.5rem', verticalAlign: 'middle' } }, tag])
-                    ]]
-                  ]],
+                  // Standard item view: Inline tags, pre-fixed absolute count, start time meta.
+                  return ["div.feed-item", { key: p.started }, [
+                    ["div.feed-item-header", [
+                      ["h3.feed-item-title", [
+                        `${startTime} - ${p.title}`,
+                        ["span.badge.badge-project", { style: { marginLeft: '0.75rem', verticalAlign: 'middle' } }, p.project || 'General'],
+                        (p.tags || []).map(tag => ["span.badge.badge-tag", { style: { marginLeft: '0.5rem', verticalAlign: 'middle' } }, tag])
+                      ]]
+                    ]],
 
-                  p.info ? 
-                    ["div.feed-item-info", m.trust(snarkdown(p.info))] : null
-                ]];
-              })
-            ]];
-          })
-        ]
+                    p.info ? 
+                      ["div.feed-item-info", m.trust(snarkdown(p.info))] : null
+                  ]];
+                })
+              ]];
+            })
+          ]
       ]],
 
       // Completion Dialog Modal
@@ -622,74 +688,6 @@ const App = {
               App.showCompletionModal = false;
             }
           }, "Let's Rest"]
-        ]]
-      ]] : null,
-
-      // Slide-over Stats Sidebar
-      App.showStatsSidebar ? ["div.sidebar-backdrop", {
-        onclick: (e) => {
-          if (e.target.className === 'sidebar-backdrop') {
-            App.showStatsSidebar = false;
-          }
-        }
-      }, [
-        ["div.sidebar-content", [
-          ["div.sidebar-header", [
-            ["h2", "📊 Focus Stats & Insights"],
-            ["button", {
-              style: { background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#777' },
-              onclick: () => App.showStatsSidebar = false
-            }, "✕"]
-          ]],
-
-          // Activity Heatmap (rendered dynamically using our shared helper module!)
-          ["div.heatmap-card", { style: { padding: '1rem', border: '1px solid #eee', borderRadius: '8px', marginBottom: '2rem' } }, [
-            ["div.heatmap-header", [
-              ["h4", { style: { margin: '0 0 0.75rem 0' } }, "Activity Heatmap"]
-            ]],
-            renderHeatmap(pm.data)
-          ]],
-
-          // Focus Stats Cards
-          ["div.stat-summary-card", { style: { marginBottom: '2rem', border: '1px solid #eee', borderRadius: '8px', padding: '1.25rem' } }, [
-            ["h3", { style: { margin: '0 0 1rem 0', color: '#0066cc' } }, "Session Summaries"],
-            ["div.stat-box", [
-              ["span", "Total Completed Sessions"],
-              ["span.stat-val", stats.total]
-            ]],
-            ["div.stat-box", [
-              ["span", "This Week's Sessions"],
-              ["span.stat-val", stats.thisWeek]
-            ]],
-            ["div.stat-box", [
-              ["span", "Total Focus Time"],
-              ["span.stat-val", `${stats.total * 25} mins`]
-            ]]
-          ]],
-
-          // Project breakdown stats table
-          ["div.stat-breakdown-card", { style: { border: '1px solid #eee', borderRadius: '8px', padding: '1.25rem' } }, [
-            ["h3", { style: { margin: '0 0 1rem 0', color: '#0066cc' } }, "Breakdown By Project"],
-            ["div", { style: { maxHeight: '280px', overflowY: 'auto' } }, [
-              ["table.breakdown-table", [
-                ["thead", [
-                  ["tr", [
-                    ["th", "Project"],
-                    ["th", "Total Poms"],
-                    ["th", "This Week"]
-                  ]]
-                ]],
-                ["tbody", Object.keys(stats.totalByProject).length === 0 ?
-                  [["tr", [["td[colspan=3]", { style: { textAlign: 'center', color: '#999' } }, "No logged pomodoros yet."]]]] :
-                  Object.keys(stats.totalByProject).map(proj => ["tr", [
-                    ["td", proj],
-                    ["td", stats.totalByProject[proj]],
-                    ["td", stats.thisWeekByProject[proj] || 0]
-                  ]])
-                ]
-              ]]
-            ]]
-          ]]
         ]]
       ]] : null
     ]]);

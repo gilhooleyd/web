@@ -29,12 +29,19 @@ const SharedHeatmap = {
     });
 
     const today = new Date();
-    const endOfWeek = new Date(today);
-    endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // Saturday
+    let startDate;
     
-    const startDate = new Date(endOfWeek);
-    startDate.setDate(endOfWeek.getDate() - 370); // ~53 weeks ago
-    startDate.setDate(startDate.getDate() - startDate.getDay()); // Sunday
+    if (options.startOfYear) {
+      startDate = new Date(today.getFullYear(), 0, 1);
+      startDate.setDate(startDate.getDate() - startDate.getDay()); // Sunday on or before Jan 1st
+    } else {
+      const endOfWeek = new Date(today);
+      endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // Saturday
+      
+      startDate = new Date(endOfWeek);
+      startDate.setDate(endOfWeek.getDate() - 370); // ~53 weeks ago
+      startDate.setDate(startDate.getDate() - startDate.getDay()); // Sunday
+    }
 
     const weeks = [];
     let currentDate = new Date(startDate);
