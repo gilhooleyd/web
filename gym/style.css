@@ -1,0 +1,886 @@
+/* Gym-specific styles, layered on top of tacit-css.css + common/style.css.
+   Overrides common/style.css's body/section spacing deliberately — this
+   page uses a bottom tab bar instead of a top nav, and aims for a
+   tighter, more app-native density than that shared stylesheet's default
+   (which was tuned for the other, simpler single-page apps in this repo). */
+
+:root {
+  --accent: #2563eb;
+}
+
+body {
+  background-color: #f7f9fc;
+  padding-top: 0;
+  padding-top: env(safe-area-inset-top);
+}
+
+.container {
+  padding: 0 0.75rem;
+}
+
+section {
+  margin-bottom: 0.75rem;
+  padding: 0.875rem;
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.6rem 0;
+}
+
+h3 {
+  font-size: 0.95rem;
+  margin: 0.75rem 0 0.4rem 0;
+  color: #444;
+}
+
+button {
+  border-radius: 10px;
+  min-height: 2.5rem;
+  font-size: 0.95rem;
+}
+
+button:has(.icon-trash) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.7rem;
+}
+
+.icon-trash {
+  vertical-align: middle;
+}
+
+.empty-hint {
+  color: #888;
+  text-align: center;
+  padding: 1rem 0;
+  margin: 0;
+}
+
+.hint {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+/* App shell: leaves room at the bottom for the fixed tab bar */
+.app-shell {
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  min-height: 100vh;
+  padding-top: 0.75rem;
+}
+
+/* Bottom bar — always present. Normal pages show three text tabs; during
+   an active session it switches to workout name + Cancel/Finish instead
+   (see bottomBar() in script.js), same bar chrome either way. */
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  min-height: 3.75rem;
+  background: white;
+  border-top: 1px solid #e5e9f0;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.tab-bar-item {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border-radius: 0;
+  color: #8a93a3;
+  font-weight: 600;
+}
+
+.tab-bar-item.active {
+  color: var(--accent);
+}
+
+.session-bar {
+  justify-content: space-between;
+  padding: 0 1rem;
+}
+
+.session-bar-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.session-bar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.page-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.25rem 0 0.75rem 0;
+}
+
+/* Home */
+.home-hero {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+.plan-label {
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.8rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.btn-large {
+  font-size: 1.1rem;
+  padding: 0.9rem 2rem;
+  margin-top: 0.75rem;
+  width: 100%;
+  max-width: 22rem;
+}
+
+.plans-section h2 {
+  margin-bottom: 0.5rem;
+}
+
+.workout-picker {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.workout-picker-label {
+  font-size: 0.8rem;
+  color: #8a93a3;
+}
+
+.workout-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+/* Generic row (used for lists: plans, workouts, sessions) */
+.row {
+  border: 1px solid #edf0f5;
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.5rem;
+  background: white;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.plan-row .row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-btn {
+  background: none;
+  color: #8a93a3;
+  padding: 0 0.4rem;
+  min-height: 2.2rem;
+  flex-shrink: 0;
+}
+
+.btn-small {
+  min-height: 2rem;
+  padding: 0 0.7rem;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  min-height: 1.75rem;
+}
+
+.row-name {
+  font-weight: 600;
+}
+
+.row-progress {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 10px;
+  margin-left: 0.5rem;
+  font-weight: 600;
+}
+
+.badge-active {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+/* Active session — extra bottom padding so the floating rest banner (see
+   .rest-float below) never covers the "+ Add Exercise" button, since the
+   banner floats on top of content rather than pushing it. */
+.session-page {
+  padding-bottom: 4.5rem;
+}
+
+.exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.card {
+  background: white;
+  border-radius: 14px;
+  padding: 0.875rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+.exercise-card.done {
+  background-color: #f2faf3;
+}
+
+.exercise-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.exercise-name {
+  font-weight: 700;
+}
+
+.exercise-target {
+  font-size: 0.78rem;
+  color: #8a93a3;
+}
+
+.set-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 10px;
+}
+
+.set-index {
+  width: 1.4rem;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #aab2c0;
+}
+
+.set-done {
+  background: #f2faf3;
+}
+
+.set-done .set-index {
+  color: #2e9e44;
+}
+
+.set-value {
+  font-weight: 600;
+  color: #2e9e44;
+}
+
+.set-done.undoable {
+  cursor: pointer;
+}
+
+.set-undo {
+  margin-left: auto;
+  color: #aab2c0;
+  font-size: 0.9rem;
+}
+
+.set-active {
+  background: #eef4ff;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.set-active .set-index {
+  color: var(--accent);
+}
+
+.set-future {
+  opacity: 0.55;
+}
+
+.set-target {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Always its own full-width row below the index/steppers — keeps the
+   active row from ever needing to fit index + two steppers + a button
+   on one line, which doesn't reliably fit on a narrow phone. */
+.set-log-btn {
+  flex: 1 1 100%;
+  padding: 0 0.9rem;
+}
+
+.add-set-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  min-height: 2.2rem;
+  font-size: 0.85rem;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.stepper-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  min-height: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  background: #eef1f6;
+  color: #333;
+}
+
+.stepper-value {
+  min-width: 2.2rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #222;
+}
+
+.group-block {
+  padding: 0.875rem;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0f2f6;
+}
+
+.group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.group-children .exercise-card {
+  box-shadow: none;
+  border: 1px solid #f0f2f6;
+}
+
+/* Rest banner — fixed above the bottom bar so it's visible no matter how
+   far you've scrolled through the exercise list, and floats over content
+   rather than participating in its flow (so it never shifts anything). */
+.rest-float {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(3.75rem + env(safe-area-inset-bottom) + 0.5rem);
+  z-index: 15;
+  background: var(--accent);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+}
+
+.rest-time {
+  font-family: monospace;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.rest-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.rest-actions button {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: white;
+  min-height: 2rem;
+  padding: 0 0.6rem;
+}
+
+/* Plan / workout editors */
+.plan-name,
+.workout-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  width: 100%;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid transparent;
+}
+
+.plan-name:focus,
+.workout-name:focus {
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+}
+
+.workout-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.workout-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.workout-editor-header .workout-name {
+  flex: 1;
+}
+
+
+.node-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.node-name {
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  flex: 1;
+  padding: 0.25rem;
+  border-bottom: 1px solid transparent;
+  min-width: 0;
+}
+
+.node-name:focus {
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+}
+
+.node-editor-actions {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.node-editor-actions button {
+  padding: 0 0.55rem;
+  min-height: 2.1rem;
+  font-size: 0.85rem;
+}
+
+.node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.node-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: #8a93a3;
+  text-transform: uppercase;
+}
+
+.field input,
+.field select {
+  font-size: 0.95rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  width: 4.6rem;
+  min-height: 2.1rem;
+}
+
+.rep-range,
+.weight-unit {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rep-range input {
+  width: 3.2rem;
+}
+
+.group-children-editor {
+  margin: 0.6rem 0 0.25rem 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid #d9e6fa;
+}
+
+.group-children-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.add-node-actions,
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cycle-sequence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.chip {
+  background-color: #e3f2fd;
+  color: #1565c0;
+  border-radius: 14px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  min-height: 0;
+}
+
+.cycle-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* History */
+.stat-row {
+  display: flex;
+  gap: 1.75rem;
+  margin: 0.4rem 0 1rem 0;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: #8a93a3;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.calendar-container {
+  overflow-x: auto;
+}
+
+.year-heatmap {
+  width: 100%;
+  max-width: 480px;
+  display: block;
+}
+
+.year-heatmap .axis-label {
+  font-size: 9px;
+  fill: #8a93a3;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.tab {
+  background-color: #eef1f6;
+  color: #555;
+  padding: 0 0.9rem;
+}
+
+.tab.active {
+  background-color: var(--accent);
+  color: white;
+}
+
+.session-groups-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.session-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.session-year-heading {
+  color: #aab2c0;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin: 0 0 0.4rem 0.1rem;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Session row: date/day/plan/workout as grid columns so the same field
+   lines up vertically from one row to the next, weight + (in edit mode)
+   delete on the right. */
+.session-row .row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-row-fields {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 3.2rem 1.6rem 1fr 3.4rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.session-col-date,
+.session-col-day,
+.session-col-workout {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.session-col-day {
+  color: #8a93a3;
+  font-weight: 500;
+}
+
+.session-col-plan {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-col-workout {
+  color: var(--accent);
+  text-align: right;
+}
+
+.session-row-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.session-detail {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #edf0f5;
+}
+
+.session-detail-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.session-exercise-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-exercise-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.session-exercise-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-left: 1.7rem;
+}
+
+.past-set {
+  background: #eef1f6;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  color: #555;
+}
+
+.progress-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.exercise-select {
+  align-self: flex-start;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #dde2ea;
+  min-height: 2.3rem;
+}
+
+.line-chart {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.line-chart .axis {
+  stroke: #edf0f5;
+}
+
+.line-chart .axis-label {
+  font-size: 10px;
+  fill: #8a93a3;
+}
+
+.line-chart .line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.line-chart .point {
+  fill: var(--accent);
+}
+
+.chart-empty {
+  color: #888;
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.summary-exercise-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.summary-exercise-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.summary-exercise-icon {
+  width: 1.2rem;
+  text-align: center;
+}
+
+.summary-exercise-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.summary-exercise-detail {
+  color: #555;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.unit-toggle {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.unit-toggle button {
+  background-color: #eef1f6;
+  color: #555;
+}
+
+.unit-toggle button.active {
+  background-color: var(--accent);
+  color: white;
+}
