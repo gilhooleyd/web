@@ -41,6 +41,9 @@ button {
   border-radius: 10px;
   min-height: 2.5rem;
   font-size: 0.95rem;
+  /* Skips the ~300ms tap-delay browsers use to detect double-tap-to-zoom,
+     and stops a fast double-tap on a button from zooming the page. */
+  touch-action: manipulation;
 }
 
 button:has(.icon-trash) {
@@ -112,13 +115,19 @@ button:has(.icon-trash) {
 }
 
 .session-bar-title {
+  flex: 1;
+  min-width: 0;
   font-weight: 700;
   font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-bar-actions {
   display: flex;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .page-nav {
@@ -284,6 +293,12 @@ button:has(.icon-trash) {
   color: #8a93a3;
 }
 
+.exercise-last {
+  margin: -0.15rem 0 0.6rem 0;
+  font-size: 0.78rem;
+  color: #8a93a3;
+}
+
 .set-rows {
   display: flex;
   flex-direction: column;
@@ -358,13 +373,6 @@ button:has(.icon-trash) {
 .set-log-btn {
   flex: 1 1 100%;
   padding: 0 0.9rem;
-}
-
-.add-set-btn {
-  width: 100%;
-  margin-top: 0.5rem;
-  min-height: 2.2rem;
-  font-size: 0.85rem;
 }
 
 .stepper {
@@ -847,11 +855,6 @@ button:has(.icon-trash) {
   gap: 0.6rem;
 }
 
-.summary-exercise-icon {
-  width: 1.2rem;
-  text-align: center;
-}
-
 .summary-exercise-name {
   font-weight: 600;
   flex: 1;
@@ -861,6 +864,43 @@ button:has(.icon-trash) {
   color: #555;
   font-size: 0.9rem;
   white-space: nowrap;
+}
+
+.summary-accepted {
+  color: #2e9e44;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.summary-exercises-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summary-exercises-header h3 {
+  margin: 0;
+}
+
+/* Change indicator — plain triangle glyphs (not emoji) so color is
+   actually controllable: green up = good, red down = bad. */
+.change-icon {
+  width: 1.2rem;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.change-up {
+  color: #2e9e44;
+}
+
+.change-down {
+  color: #dc2626;
+}
+
+.change-none {
+  color: #aab2c0;
 }
 
 .field-row {

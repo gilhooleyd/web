@@ -184,6 +184,11 @@ function seedDemoSessions(plan, sessionCount = 12) {
     const results = finishSession(plan, workout, session);
     session.finishedAt = date.toISOString(); // finishSession stamps "now" — back-date it to fit the simulated history
 
+    // Real usage leaves 'increase' as a proposal for the finish screen's
+    // Accept button — there's no one to click it here, so the simulation
+    // accepts every increase immediately to keep the demo weights climbing.
+    results.forEach((r) => { if (r.change === 'increase') acceptProgressionIncrease(workout, r.nodeId, r.to); });
+
     const increasedNames = new Set(results.filter((r) => r.change === 'increase').map((r) => r.name));
     leaves.forEach((leaf) => {
       repTarget[leaf.path] = increasedNames.has(leaf.name)
@@ -309,32 +314,60 @@ function logGroupSet(session, groupNode, groupPath, leafPath, reps, weight) {
 
 // (exerciseNode, loggedSets: {reps, weight}[]) -> { nextWeight, change }
 // change is 'increase' | 'decrease' | 'none'.
+//
+// Progression is based on the weight you actually logged, not the plan's
+// stored baseline — the log-set stepper defaults to that baseline but you
+// can dial it up or down live, and once a session validates the new
+// weight (didn't miss the bottom of the rep range), that becomes the new
+// baseline rather than the plan silently reverting to its old value next
+// time (e.g. you bump the weight up and just barely hit the minimum reps
+// — that's real progress, not a no-op).
 //   - Every set at or above the top of the rep range: topped out, go up.
 //   - Any set below the BOTTOM of the rep range: missed the floor, go back
 //     down (same step size as the increase) — you took too much weight.
-//   - Otherwise: still working through the rep range at this weight.
+//   - Otherwise still within the rep range: adopt whatever weight was
+//     actually logged, if it differs from the plan's baseline.
 function applyDoubleProgression(node, loggedSets) {
   if (!node.progression || node.progression.type !== 'double-progression' || !loggedSets.length) {
     return { nextWeight: node.weight, change: 'none' };
   }
+  const actualWeight = loggedSets[loggedSets.length - 1].weight;
   if (loggedSets.every((s) => s.reps >= node.repRange.max)) {
-    return { nextWeight: round(node.weight + node.progression.increment), change: 'increase' };
+    return { nextWeight: round(actualWeight + node.progression.increment), change: 'increase' };
   }
   if (loggedSets.some((s) => s.reps < node.repRange.min)) {
-    return { nextWeight: Math.max(0, round(node.weight - node.progression.increment)), change: 'decrease' };
+    return { nextWeight: Math.max(0, round(actualWeight - node.progression.increment)), change: 'decrease' };
+  }
+  if (actualWeight !== node.weight) {
+    return { nextWeight: actualWeight, change: actualWeight > node.weight ? 'increase' : 'decrease' };
   }
   return { nextWeight: node.weight, change: 'none' };
+}
+
+// Applies one accepted increase to the real plan node — 'increase'
+// results are proposals from finishSession (see below), not applied
+// automatically; the finish-summary screen calls this per exercise (or
+// for all of them via "Accept All"). 'decrease' results, by contrast,
+// are applied immediately by finishSession itself — see its comment.
+function acceptProgressionIncrease(workout, nodeId, nextWeight) {
+  const node = findNodeByPath(workout.nodes, nodeId);
+  if (node) node.weight = nextWeight;
 }
 
 // ---------------------------------------------------------------------
 // Finishing a session: live entries -> stored entries, apply progression,
 // mutate the plan's node weights, advance the cycle.
-// Mutates `session`, `workout` (node weights) and `plan` (cursor) in place.
+// Mutates `session` and `plan` (cursor) in place. A 'decrease' is applied
+// to the real node immediately — missing the bottom of the rep range
+// means the weight was too heavy, so there's nothing to confirm. An
+// 'increase' is NOT applied here: it's a proposal the finish-summary
+// screen shows with an Accept button (see acceptProgressionIncrease) —
+// you might want to stay at a weight longer even after topping out.
 // Each stored entry carries its own `change`/`weightFrom`/`weightTo` (so
-// History can show the same increase/decrease indicator later, not just
-// the finish summary right after logging it) — also returned as a flat
-// `results` list ({ name, from, to, unit, change }) for the finish
-// summary, one per worked exercise, not just the ones that changed.
+// History can show the same indicator later, not just right after
+// logging it) — also returned as a flat `results` list
+// ({ nodeId, name, from, to, unit, change }) for the finish summary, one
+// per worked exercise, not just the ones that changed.
 // ---------------------------------------------------------------------
 
 function finishSession(plan, workout, session) {
@@ -347,7 +380,7 @@ function finishSession(plan, workout, session) {
     if (!sets || !sets.length) continue;
 
     const { nextWeight, change } = applyDoubleProgression(leaf, sets);
-    if (change !== 'none') {
+    if (change === 'decrease') {
       const realNode = findNodeByPath(workout.nodes, leaf.path);
       if (realNode) realNode.weight = nextWeight;
     }
@@ -362,7 +395,7 @@ function finishSession(plan, workout, session) {
       weightFrom: leaf.weight,
       weightTo: nextWeight,
     });
-    results.push({ name: leaf.name, from: leaf.weight, to: nextWeight, unit: leaf.unit, change });
+    results.push({ nodeId: leaf.path, name: leaf.name, from: leaf.weight, to: nextWeight, unit: leaf.unit, change });
   }
 
   session.entries = storedEntries;
@@ -411,14 +444,26 @@ function exerciseSeries(sessions, name) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// The last set of the most recent session that logged this exercise (by
+// name, same identity rule as exerciseSeries) — shown on the exercise
+// card while logging today, as a "here's what you did last time"
+// reference. null if it's never been logged before.
+function lastLoggedSet(sessions, name) {
+  const finished = sessions.filter((s) => s.finishedAt).sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
+  for (const s of finished) {
+    const entry = (s.entries || []).find((e) => e.name === name);
+    if (entry && entry.sets.length) return entry.sets[entry.sets.length - 1];
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------
 // Formatting
 // ---------------------------------------------------------------------
 
-// Compact form for large numbers in a stat tile, e.g. 128450 -> "128.5k"
+// Comma-grouped, not abbreviated — "7,420", never "7.4k".
 function formatVolume(n) {
-  const r = round(n);
-  return r >= 1000 ? `${round(r / 1000)}k` : r.toString();
+  return round(n).toLocaleString();
 }
 
 // Milliseconds -> "42 min" or "1h 12m" for the finish-summary "time spent" stat.
@@ -433,10 +478,7 @@ function formatDuration(ms) {
 // session detail, so both read the same way. `to` may be missing on
 // sessions logged before `change`/weight-from/weight-to existed in the
 // stored-entry shape — degrades to no detail text rather than "undefined".
-function progressionChangeIcon(change) {
-  return change === 'increase' ? '🔺' : (change === 'decrease' ? '🔻' : '▪');
-}
-
+// (The icon itself is a view concern — see changeIcon() in script.js.)
 function progressionChangeDetail(change, from, to, unit) {
   if (to == null) return null;
   return change === 'none' ? `${to}${unit}` : `${from}${unit} → ${to}${unit}`;

@@ -41,6 +41,17 @@ function formatRestTime(totalSeconds) {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
+// Like formatRestTime but with hours, for the bottom bar's live workout
+// clock — a rest period is always under an hour, a workout isn't always.
+function formatElapsed(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? m.toString().padStart(2, '0') : m;
+  return h > 0 ? `${h}:${mm}:${sec.toString().padStart(2, '0')}` : `${mm}:${sec.toString().padStart(2, '0')}`;
+}
+
 function shortMonthDay(dateStr) {
   const d = parseLocalDate(dateStr);
   return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
@@ -122,6 +133,16 @@ function cogIcon() {
   ]];
 }
 
+// Green up / red down, not emoji (color-emoji glyphs like 🔺 render as a
+// fixed color no matter what — plain triangle characters respect CSS
+// `color`, so "increase" reads as unambiguously good and "decrease" as
+// unambiguously bad rather than both being the same red).
+function changeIcon(change) {
+  if (change === 'increase') return ['span.change-icon.change-up', '▲'];
+  if (change === 'decrease') return ['span.change-icon.change-down', '▼'];
+  return ['span.change-icon.change-none', '▪'];
+}
+
 // Per-exercise draft (weight/reps currently dialed in for the next set),
 // lazily created from the exercise's target the first time it's touched.
 function getDraft(node, path) {
@@ -143,13 +164,16 @@ function getDraft(node, path) {
 // `totalSets` defaults to the node's own `sets`, but a group child passes
 // its group's round count instead — a group's `sets` is the number of
 // rounds through its children, not a per-child count (see model.js).
-// Sets added mid-workout via "+ Add Set" (session.extraSets) extend this
-// for just today, without touching the plan template.
+// Once every planned set is logged, one more active-style row appears —
+// its "Add Set" button both extends `totalSets` for just today
+// (session.extraSets, not the plan template) and logs the set in one tap,
+// rather than a separate always-visible "+ Add Set" button.
 function exerciseCard(node, path, onLog, baseTotalSets = node.sets) {
   const totalSets = baseTotalSets + (App.session.extraSets[path] || 0);
   const logged = loggedSetsFor(App.session, path);
   const done = logged.length >= totalSets;
   const draft = getDraft(node, path);
+  const lastSet = lastLoggedSet(App.sessions, node.name);
 
   const rows = [];
   for (let i = 0; i < totalSets; i++) {
@@ -178,14 +202,22 @@ function exerciseCard(node, path, onLog, baseTotalSets = node.sets) {
       ]]);
     }
   }
+  if (done) {
+    rows.push(['div.set-row.set-active', { key: 'extra' }, [
+      ['span.set-index', `${totalSets + 1}`],
+      stepperControl(draft.weight, (v) => { draft.weight = v; }, { min: 0, step: weightStep(node.unit) }),
+      stepperControl(draft.reps, (v) => { draft.reps = v; }, { min: 0, step: 1 }),
+      ['button.btn-success.set-log-btn', { onclick: () => { App.addExtraSet(path); onLog(draft); } }, 'Add Set'],
+    ]]);
+  }
 
   return ['div.card.exercise-card', { key: path, class: done ? 'done' : '' }, [
     ['div.exercise-card-header', [
       ['span.exercise-name', node.name],
       ['span.exercise-target', `${node.repRange.min}-${node.repRange.max} reps`],
     ]],
+    lastSet ? ['p.exercise-last', `Last: ${lastSet.weight}${node.unit} × ${lastSet.reps}`] : null,
     ['div.set-rows', rows],
-    ['button.btn-secondary.add-set-btn', { onclick: () => App.addExtraSet(path) }, '+ Add Set'],
   ]];
 }
 
@@ -214,16 +246,27 @@ function sessionNodesView(workout) {
   });
 }
 
+// Seconds remaining, computed from the stored end timestamp rather than
+// ticked down — see App.startRest for why (setInterval gets throttled or
+// fully suspended in a backgrounded/locked-screen tab, so a counter that
+// only decrements on tick effectively pauses; a timestamp-based countdown
+// always reflects real elapsed time the moment anything re-renders it,
+// catching up instantly instead of staying frozen).
+function restSecondsLeft() {
+  if (App.rest.endsAt == null) return 0;
+  return Math.max(0, Math.ceil((App.rest.endsAt - Date.now()) / 1000));
+}
+
 // Fixed-position, so it floats above the exercise list regardless of
 // scroll position, and appearing/disappearing never shifts that list
 // (it isn't part of the normal document flow either way).
 function restFloat() {
-  if (App.rest.timerId == null) return null;
+  if (App.rest.endsAt == null) return null;
   return ['div.rest-float', [
     ['span.rest-label', 'Resting'],
-    ['span.rest-time', formatRestTime(App.rest.secondsLeft)],
+    ['span.rest-time', formatRestTime(restSecondsLeft())],
     ['div.rest-actions', [
-      ['button', { onclick: () => { App.rest.secondsLeft += 15; } }, '+15s'],
+      ['button', { onclick: () => { App.rest.endsAt += 15000; } }, '+15s'],
       ['button', { onclick: () => App.stopRest() }, 'Skip'],
     ]],
   ]];
@@ -291,17 +334,24 @@ function activeSessionView() {
   ]];
 }
 
+// A proposed 'increase' needs an explicit Accept (see model.js's
+// finishSession/acceptProgressionIncrease) — 'decrease' and 'none' are
+// already applied or need no action, so they show no button.
 function summaryExerciseRow(r) {
   return ['div.row.summary-exercise-row', { key: r.name }, [
-    ['span.summary-exercise-icon', progressionChangeIcon(r.change)],
+    changeIcon(r.change),
     ['span.summary-exercise-name', r.name],
     ['span.summary-exercise-detail', progressionChangeDetail(r.change, r.from, r.to, r.unit)],
+    r.change === 'increase' ? (r.accepted
+      ? ['span.summary-accepted', '✓']
+      : ['button.btn-success.btn-small', { onclick: () => App.acceptIncrease(r) }, 'Accept']) : null,
   ]];
 }
 
 function sessionSummaryView() {
   const summary = App.finishSummary;
   if (!summary) return null;
+  const pendingIncreases = summary.results.filter((r) => r.change === 'increase' && !r.accepted);
   return ['div.container', [
     ['section', [
       ['h2', `Workout ${summary.workoutName} complete`],
@@ -313,9 +363,14 @@ function sessionSummaryView() {
           ['span.stat-label', 'Weight Lifted'],
         ]],
       ]],
-      ['h3', 'Exercises'],
+      ['div.summary-exercises-header', [
+        ['h3', 'Exercises'],
+        pendingIncreases.length > 1
+          ? ['button.btn-success.btn-small', { onclick: () => App.acceptAllIncreases() }, 'Accept All']
+          : null,
+      ]],
       ['div.summary-exercise-list', summary.results.map((r) => summaryExerciseRow(r))],
-      ['button.btn-primary', { onclick: () => { App.finishSummary = null; App.page = 'home'; } }, 'Done'],
+      ['button.btn-success', { onclick: () => { App.finishSummary = null; App.page = 'home'; } }, 'Done'],
     ]],
   ]];
 }
@@ -440,7 +495,7 @@ function sessionDetailRow(e) {
   const detail = progressionChangeDetail(e.change, e.weightFrom, e.weightTo, e.unit);
   return ['div.session-detail-row', { key: e.nodeId }, [
     ['div.session-exercise-header', [
-      ['span.summary-exercise-icon', progressionChangeIcon(e.change)],
+      changeIcon(e.change),
       ['span.session-exercise-name', e.name],
       detail ? ['span.summary-exercise-detail', detail] : null,
     ]],
@@ -609,11 +664,12 @@ function tabBarItem(page, label) {
 // without a dedicated in-page header.
 function bottomBar() {
   if (App.page === 'session') {
+    const elapsedSeconds = (Date.now() - new Date(App.session.startedAt).getTime()) / 1000;
     return ['nav.tab-bar.session-bar', [
-      ['span.session-bar-title', `Workout ${App.currentWorkout().name}`],
+      ['span.session-bar-title', `Workout ${App.currentWorkout().name} · ${formatElapsed(elapsedSeconds)}`],
       ['div.session-bar-actions', [
         ['button.btn-secondary', { onclick: () => App.cancelSession() }, 'Cancel'],
-        ['button.btn-primary', { onclick: () => App.finishWorkout() }, 'Finish'],
+        ['button.btn-success', { onclick: () => App.finishWorkout() }, 'Finish'],
       ]],
     ]];
   }
@@ -639,7 +695,8 @@ const App = {
   // there's nowhere for them to drift out of sync with the session itself.
   session: null,
   logDraft: {}, // leaf path -> { weight, reps }
-  rest: { secondsLeft: 0, timerId: null },
+  rest: { endsAt: null, timerId: null }, // endsAt: ms timestamp, not a countdown — see restSecondsLeft
+  workoutClockId: null, // ticks the bottom bar's elapsed-time display; see startWorkoutClock
   finishSummary: null,
 
   // Editors
@@ -666,6 +723,7 @@ const App = {
       const workout = plan && plan.workouts.find((w) => w.id === active.workoutId);
       if (plan && workout) {
         App.session = active;
+        App.startWorkoutClock();
         App.page = 'session';
       } else {
         Storage.clearActiveSession();
@@ -764,6 +822,7 @@ const App = {
     App.session = newSession(plan, workout);
     App.logDraft = {};
     App.saveActiveSession();
+    App.startWorkoutClock();
     App.page = 'session';
   },
 
@@ -798,10 +857,9 @@ const App = {
 
   startRest: (seconds) => {
     App.stopRest();
-    App.rest.secondsLeft = seconds;
+    App.rest.endsAt = Date.now() + seconds * 1000;
     App.rest.timerId = setInterval(() => {
-      App.rest.secondsLeft -= 1;
-      if (App.rest.secondsLeft <= 0) App.stopRest();
+      if (restSecondsLeft() <= 0) App.stopRest();
       m.redraw();
     }, 1000);
   },
@@ -809,7 +867,21 @@ const App = {
   stopRest: () => {
     if (App.rest.timerId) clearInterval(App.rest.timerId);
     App.rest.timerId = null;
-    App.rest.secondsLeft = 0;
+    App.rest.endsAt = null;
+  },
+
+  // Ticks the bottom bar's live elapsed-workout-time display. Also
+  // timestamp-based (session.startedAt, computed fresh each tick) rather
+  // than an incrementing counter, for the same reason as the rest
+  // timer — stays correct even through a backgrounded/locked-screen tab.
+  startWorkoutClock: () => {
+    App.stopWorkoutClock();
+    App.workoutClockId = setInterval(() => m.redraw(), 1000);
+  },
+
+  stopWorkoutClock: () => {
+    if (App.workoutClockId) clearInterval(App.workoutClockId);
+    App.workoutClockId = null;
   },
 
   // Tears down the in-progress session state — shared by finishing,
@@ -817,6 +889,7 @@ const App = {
   // same handful of fields to null out in lockstep.
   clearSession: () => {
     App.stopRest();
+    App.stopWorkoutClock();
     App.session = null;
     App.logDraft = {};
     Storage.clearActiveSession();
@@ -834,10 +907,24 @@ const App = {
     App.saveSessions();
     App.savePlans();
     App.finishSummary = {
-      workoutName: workout.name, results, setCount, totalVolume, durationMs, unit: App.settings.unit,
+      workoutName: workout.name, workout, results, setCount, totalVolume, durationMs, unit: App.settings.unit,
     };
     App.clearSession();
     App.page = 'sessionSummary';
+  },
+
+  // A proposed weight increase (see model.js's finishSession) isn't
+  // applied to the plan until accepted here.
+  acceptIncrease: (result) => {
+    acceptProgressionIncrease(App.finishSummary.workout, result.nodeId, result.to);
+    result.accepted = true;
+    App.savePlans();
+  },
+
+  acceptAllIncreases: () => {
+    App.finishSummary.results
+      .filter((r) => r.change === 'increase' && !r.accepted)
+      .forEach((r) => App.acceptIncrease(r));
   },
 
   // No confirmation — a deliberate choice: Cancel just exits, nothing logged.
@@ -880,3 +967,11 @@ const App = {
 };
 
 m.mount(document.getElementById('app-mount'), App);
+
+// The rest timer and workout clock are timestamp-based specifically so
+// they're correct the instant anything redraws them — but nothing
+// redraws while the tab is hidden, so force one the moment you come
+// back rather than waiting up to a second for the next regular tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) m.redraw();
+});
