@@ -975,3 +975,12 @@ m.mount(document.getElementById('app-mount'), App);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) m.redraw();
 });
+
+// Registers the offline cache — see service-worker.js. A page freshly
+// opened with no network at all can't run this for the first time (there's
+// nothing to serve it from yet), but every visit after the first online one
+// caches the app shell, so subsequent opens work with no signal.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+    .catch((err) => console.error('Service worker registration failed:', err));
+}

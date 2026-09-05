@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gym Tracker</title>
+
+    <!-- PWA: installable + works offline (see service-worker.js) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="icon" href="icons/icon-512.png">
+
+    <!-- iOS ignores the manifest's icons/display for "Add to Home Screen" —
+         these are the tags it actually reads. -->
+    <link rel="apple-touch-icon" href="icons/icon-512.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Gym">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
     <link rel="stylesheet" href="../libs/tacit-css.css"/>
     <link rel="stylesheet" href="../common/style.css"/>
     <link rel="stylesheet" href="style.css"/>
