@@ -633,6 +633,65 @@ function progressTabView() {
   ]];
 }
 
+// Pure: the flat day-cell list for a month — `null` for the blank cells
+// that pad the first and last weeks so the 1st lands under its weekday.
+// Sunday-start, matching WEEKDAY_ABBR.
+function monthCells(year, month, counts) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < new Date(year, month, 1).getDay(); i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    cells.push({ day: d, dateStr, sessions: counts[dateStr] || 0 });
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+// Pure: the month `delta` months away from { year, month }.
+function shiftMonth({ year, month }, delta) {
+  const d = new Date(year, month + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+// Monthly calendar for the History screen: centered month title with
+// prev/next arrows, a 7-column grid, and a green bubble on any day that
+// has a finished session.
+function historyCalendarView(finished) {
+  const { year, month } = App.historyMonth;
+  const counts = {};
+  finished.forEach((s) => { counts[s.date] = (counts[s.date] || 0) + 1; });
+  const cells = monthCells(year, month, counts);
+  const today = localDateStr(new Date());
+  const title = new Date(year, month, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const dow = WEEKDAY_ABBR.map((w, i) => ['span.month-cal-dow', { key: `dow${i}` }, w]);
+  const days = cells.map((cell, i) => {
+    if (!cell) return ['span.month-cal-day.is-blank', { key: `blank${i}` }];
+    const cls = [cell.sessions ? 'is-worked' : '', cell.dateStr === today ? 'is-today' : ''].join(' ').trim();
+    return ['span.month-cal-day', {
+      key: cell.dateStr,
+      class: cls,
+      title: cell.sessions ? `${shortMonthDay(cell.dateStr)}: ${cell.sessions} session${cell.sessions === 1 ? '' : 's'}` : undefined,
+    }, [['span.month-cal-daynum', String(cell.day)]]];
+  });
+
+  return ['div.month-cal', [
+    ['div.month-cal-nav', [
+      ['button.month-cal-arrow', {
+        'aria-label': 'Previous month',
+        onclick: () => { App.historyMonth = shiftMonth(App.historyMonth, -1); },
+      }, '‹'],
+      ['span.month-cal-title', title],
+      ['button.month-cal-arrow', {
+        'aria-label': 'Next month',
+        onclick: () => { App.historyMonth = shiftMonth(App.historyMonth, 1); },
+      }, '›'],
+    ]],
+    ['div.month-cal-grid', [...dow, ...days]],
+  ]];
+}
+
 function historyView() {
   const finished = App.sessions.filter((s) => s.finishedAt).slice().sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
   return ['div.container', [
@@ -645,7 +704,7 @@ function historyView() {
           ['span.stat-label', 'Weight Lifted'],
         ]],
       ]],
-      ['div.calendar-container', [YearHeatmap.render(finished, { timestampField: 'date' })]],
+      historyCalendarView(finished),
     ]],
     ['section', [
       ['div.tabs', [
@@ -771,6 +830,8 @@ const App = {
   expandedSessionId: null,
   progressExercise: null,
   historyEditMode: false,
+  // Month shown by the History calendar (view-only, not persisted).
+  historyMonth: { year: new Date().getFullYear(), month: new Date().getMonth() },
 
   oninit: () => {
     App.plans = Storage.loadPlans();
