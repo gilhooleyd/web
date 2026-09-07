@@ -31,6 +31,10 @@ function parseLocalDate(dateStr) {
 // Plan / Workout / ExerciseNode construction
 // ---------------------------------------------------------------------
 
+// A bodyweight exercise (push-ups, squats, crunches — no external load)
+// has no weight/unit/progression at all, same as a group node — there's
+// nothing for double progression to act on, so it's just off, not a
+// weight of 0 (which would still mean something for a barbell lift).
 function newExercise({
   name = 'New Exercise',
   sets = 3,
@@ -39,6 +43,7 @@ function newExercise({
   unit = 'lb',
   restSeconds = 90,
   increment = 2.5,
+  bodyweight = false,
 } = {}) {
   return {
     id: genId('node'),
@@ -46,10 +51,11 @@ function newExercise({
     name,
     sets,
     repRange: { min: repRange.min, max: repRange.max },
-    weight,
-    unit,
+    weight: bodyweight ? null : weight,
+    unit: bodyweight ? null : unit,
     restSeconds,
-    progression: { type: 'double-progression', increment },
+    progression: bodyweight ? null : { type: 'double-progression', increment },
+    bodyweight,
     children: null,
   };
 }
@@ -184,10 +190,13 @@ function seedDemoSessions(plan, sessionCount = 12) {
     const results = finishSession(plan, workout, session);
     session.finishedAt = date.toISOString(); // finishSession stamps "now" — back-date it to fit the simulated history
 
-    // Real usage leaves 'increase' as a proposal for the finish screen's
-    // Accept button — there's no one to click it here, so the simulation
-    // accepts every increase immediately to keep the demo weights climbing.
-    results.forEach((r) => { if (r.change === 'increase') acceptProgressionIncrease(workout, r.nodeId, r.to); });
+    // Real usage leaves 'increase'/'decrease' as proposals for the finish
+    // screen's Accept button — there's no one to click it here, so the
+    // simulation accepts every change immediately to keep the demo weights
+    // tracking what double progression actually proposed.
+    results.forEach((r) => {
+      if (r.change === 'increase' || r.change === 'decrease') acceptProgressionChange(plan, r.name, r.to);
+    });
 
     const increasedNames = new Set(results.filter((r) => r.change === 'increase').map((r) => r.name));
     leaves.forEach((leaf) => {
@@ -221,12 +230,15 @@ function flattenLeaves(nodes, pathPrefix = '') {
   return leaves;
 }
 
-function findNodeByPath(nodes, path) {
-  const [headId, ...rest] = path.split('.');
-  const node = nodes.find((n) => n.id === headId);
-  if (!node) return null;
-  if (rest.length === 0) return node;
-  return findNodeByPath(node.children || [], rest.join('.'));
+// Visit every leaf exercise node in a node tree, descending into groups.
+// Unlike flattenLeaves (which returns detached `{...node}` copies for
+// read-only path lookups), this yields the live nodes so callers can
+// update them in place — e.g. propagating an accepted weight change.
+function forEachExercise(nodes, fn) {
+  for (const node of nodes) {
+    if (node.kind === 'group') forEachExercise(node.children || [], fn);
+    else fn(node);
+  }
 }
 
 // Move the item at `index` by `delta` positions (e.g. -1 = up, +1 = down).
@@ -344,25 +356,29 @@ function applyDoubleProgression(node, loggedSets) {
   return { nextWeight: node.weight, change: 'none' };
 }
 
-// Applies one accepted increase to the real plan node — 'increase'
-// results are proposals from finishSession (see below), not applied
-// automatically; the finish-summary screen calls this per exercise (or
-// for all of them via "Accept All"). 'decrease' results, by contrast,
-// are applied immediately by finishSession itself — see its comment.
-function acceptProgressionIncrease(workout, nodeId, nextWeight) {
-  const node = findNodeByPath(workout.nodes, nodeId);
-  if (node) node.weight = nextWeight;
+// Applies one accepted weight change to the plan. Both 'increase' and
+// 'decrease' results are proposals from finishSession (see below) that
+// the finish-summary screen confirms per exercise (or all at once via
+// "Accept All") — nothing here is applied automatically.
+//
+// Double progression tracks a lift by NAME within the plan: "Curls" in
+// workout A and "Curls" in workout B are the same lift on different days,
+// so an accepted change moves every exercise with that exact name across
+// all of the plan's workouts, not just the one that was logged.
+function acceptProgressionChange(plan, name, nextWeight) {
+  plan.workouts.forEach((workout) => forEachExercise(workout.nodes, (node) => {
+    if (!node.bodyweight && node.name === name) node.weight = nextWeight;
+  }));
 }
 
 // ---------------------------------------------------------------------
-// Finishing a session: live entries -> stored entries, apply progression,
-// mutate the plan's node weights, advance the cycle.
-// Mutates `session` and `plan` (cursor) in place. A 'decrease' is applied
-// to the real node immediately — missing the bottom of the rep range
-// means the weight was too heavy, so there's nothing to confirm. An
-// 'increase' is NOT applied here: it's a proposal the finish-summary
-// screen shows with an Accept button (see acceptProgressionIncrease) —
-// you might want to stay at a weight longer even after topping out.
+// Finishing a session: live entries -> stored entries, work out
+// progression proposals, advance the cycle.
+// Mutates `session` and `plan` (cursor) in place. Neither 'increase' nor
+// 'decrease' is applied to the plan here — both are proposals the
+// finish-summary screen confirms with an Accept button (see
+// acceptProgressionChange). You might want to hold a weight longer after
+// topping out, and a missed rep range might just have been a bad day.
 // Each stored entry carries its own `change`/`weightFrom`/`weightTo` (so
 // History can show the same indicator later, not just right after
 // logging it) — also returned as a flat `results` list
@@ -380,22 +396,21 @@ function finishSession(plan, workout, session) {
     if (!sets || !sets.length) continue;
 
     const { nextWeight, change } = applyDoubleProgression(leaf, sets);
-    if (change === 'decrease') {
-      const realNode = findNodeByPath(workout.nodes, leaf.path);
-      if (realNode) realNode.weight = nextWeight;
-    }
 
     storedEntries.push({
       nodeId: leaf.path,
       name: leaf.name,
       unit: leaf.unit,
       repRange: leaf.repRange,
+      bodyweight: !!leaf.bodyweight,
       sets: sets.slice(),
       change,
       weightFrom: leaf.weight,
       weightTo: nextWeight,
     });
-    results.push({ nodeId: leaf.path, name: leaf.name, from: leaf.weight, to: nextWeight, unit: leaf.unit, change });
+    results.push({
+      nodeId: leaf.path, name: leaf.name, from: leaf.weight, to: nextWeight, unit: leaf.unit, change, bodyweight: !!leaf.bodyweight,
+    });
   }
 
   session.entries = storedEntries;
@@ -417,6 +432,10 @@ function entryVolume(entry) {
   return entry.sets.reduce((sum, set) => sum + set.weight * set.reps, 0);
 }
 
+function entryTotalReps(entry) {
+  return entry.sets.reduce((sum, set) => sum + set.reps, 0);
+}
+
 function sessionVolume(session) {
   return session.entries.reduce((sum, entry) => sum + entryVolume(entry), 0);
 }
@@ -432,13 +451,19 @@ function distinctExerciseNames(sessions) {
 }
 
 // -> [{ date, volume, unit }], one point per session that logged this
-// exercise, oldest first.
+// exercise, oldest first. "volume" is weight x reps normally, but a
+// bodyweight exercise has no weight to make that meaningful (it'd just be
+// zero every time) — total reps that session is the closer equivalent of
+// "how much work did I do," so that's plotted instead.
 function exerciseSeries(sessions, name) {
   return sessions
     .filter((s) => s.finishedAt)
     .map((s) => {
       const entry = (s.entries || []).find((e) => e.name === name);
-      return entry ? { date: s.date, volume: entryVolume(entry), unit: entry.unit } : null;
+      if (!entry) return null;
+      return entry.bodyweight
+        ? { date: s.date, volume: entryTotalReps(entry), unit: 'reps' }
+        : { date: s.date, volume: entryVolume(entry), unit: entry.unit };
     })
     .filter(Boolean)
     .sort((a, b) => a.date.localeCompare(b.date));

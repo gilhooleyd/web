@@ -1,16 +1,28 @@
 /**
  * Caches the app shell so the app still opens with no signal (airplane
  * mode, bad gym wifi). Fully static/offline-capable already — everything
- * the app needs beyond these files is localStorage, not network — so a
- * simple cache-first strategy over a fixed precache list is enough; there's
- * no dynamically-fetched content to account for.
+ * the app needs beyond these files is localStorage, not network.
  *
- * Bump CACHE_NAME whenever a shipped file changes. There's no build step
- * generating a content hash, so this is a manual "did I change something"
- * convention: install fetches everything fresh into the new cache name,
- * activate deletes whatever old-named cache is left over.
+ * Strategy: stale-while-revalidate. Every request is answered from the
+ * cache immediately if it's there (this is what makes a cold open fast),
+ * and the cache entry is refreshed from the network in the background so
+ * a changed file lands on the *next* open. Only a genuine cache miss
+ * waits on the network at all.
+ *
+ * Why not the old plain cache-first: a cache-first handler with no
+ * network timeout falls through to `fetch()` for anything it can't match
+ * — a URL with a `?query`, a navigation the SW isn't controlling yet —
+ * and on flaky wifi that `fetch()` hangs for many seconds before failing.
+ * That stall on launch is the "odd delay". Fixes here: `ignoreSearch` so
+ * query strings still hit the cache, navigation preload so the network
+ * probe runs *during* SW startup instead of after it, and a navigation
+ * fallback to the cached index so a miss can never block the app opening.
+ *
+ * CACHE_NAME still needs a manual bump when a shipped file changes (no
+ * build step to hash content) — but stale-while-revalidate means a missed
+ * bump self-heals on the following open rather than serving stale forever.
  */
-const CACHE_NAME = 'gym-cache-v1';
+const CACHE_NAME = 'gym-cache-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -35,16 +47,52 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
-  );
+  event.waitUntil((async () => {
+    if (self.registration.navigationPreload) {
+      await self.registration.navigationPreload.enable();
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
+// Refresh one cache entry from the network. Returns the network response
+// (or undefined if offline / it failed) — callers decide whether to wait
+// on it or let it run in the background.
+async function revalidate(cache, request, preloadResponse) {
+  try {
+    const response = (preloadResponse && (await preloadResponse)) || (await fetch(request));
+    if (response && response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch (e) {
+    return undefined;
+  }
+}
+
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request)),
-  );
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request, { ignoreSearch: true });
+    const networkFetch = revalidate(cache, request, event.preloadResponse);
+
+    if (cached) {
+      event.waitUntil(networkFetch); // keep the SW alive for the background refresh
+      return cached;
+    }
+
+    const network = await networkFetch;
+    if (network) return network;
+
+    // Offline and never cached — for a navigation, the app shell is a
+    // fine stand-in (the app is a single page); otherwise there's nothing
+    // to give back.
+    if (request.mode === 'navigate') {
+      return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
+    }
+    return Response.error();
+  })());
 });

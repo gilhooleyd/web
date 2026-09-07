@@ -61,11 +61,45 @@ function weekdayAbbr(dateStr) {
   return WEEKDAY_ABBR[parseLocalDate(dateStr).getDay()];
 }
 
+// Parse a numeric field's raw string value, clamped to `min`.
+// Empty / non-numeric -> `min`.
+function clampNumber(raw, min = 0) {
+  const n = parseFloat(raw);
+  return Number.isNaN(n) ? min : Math.max(min, round(n));
+}
+
+// The oninput/onblur pair shared by every editable numeric field (the
+// steppers below and the editor's numberInput). While the field is being
+// edited we let it go transiently empty — deleting the last digit — by
+// skipping the redraw (so Mithril doesn't immediately repaint `min` over
+// what was typed) and leaving the model untouched until blur, which
+// clamps. Without this you can never clear a field to retype it.
+function numericFieldHandlers(onChange, min) {
+  return {
+    // Tap/focus selects the whole value so the next keystroke replaces it
+    // wholesale — the common "set it to a specific number" gesture.
+    onfocus: (e) => e.target.select(),
+    oninput: (e) => {
+      if (e.target.value === '') { e.redraw = false; return; }
+      onChange(clampNumber(e.target.value, min));
+    },
+    onblur: (e) => {
+      if (e.target.value === '' || Number.isNaN(parseFloat(e.target.value))) onChange(min);
+    },
+  };
+}
+
+// Live logging stepper: −/＋ buttons around an editable number. The value
+// is a real <input> (not a span) so tapping it on a phone brings up the
+// numeric keyboard and it can be typed directly on a laptop.
 function stepperControl(value, onChange, { min = 0, step = 1 } = {}) {
   return ['div.stepper', [
-    ['button.stepper-btn', { onclick: () => onChange(Math.max(min, round(value - step))) }, '−'],
-    ['span.stepper-value', round(value).toString()],
-    ['button.stepper-btn', { onclick: () => onChange(round(value + step)) }, '+'],
+    ['button.stepper-btn', { type: 'button', onclick: () => onChange(Math.max(min, round(value - step))) }, '−'],
+    ['input.stepper-value', {
+      type: 'number', inputmode: 'decimal', min, step, value: round(value),
+      ...numericFieldHandlers(onChange, min),
+    }],
+    ['button.stepper-btn', { type: 'button', onclick: () => onChange(round(value + step)) }, '+'],
   ]];
 }
 
@@ -74,7 +108,7 @@ function stepperControl(value, onChange, { min = 0, step = 1 } = {}) {
 function numberInput(value, onChange, { min = 0, step = 1 } = {}) {
   return ['input', {
     type: 'number', min, step, value,
-    oninput: (e) => onChange(Math.max(min, +e.target.value || min)),
+    ...numericFieldHandlers(onChange, min),
   }];
 }
 
@@ -164,10 +198,10 @@ function getDraft(node, path) {
 // `totalSets` defaults to the node's own `sets`, but a group child passes
 // its group's round count instead — a group's `sets` is the number of
 // rounds through its children, not a per-child count (see model.js).
-// Once every planned set is logged, one more active-style row appears —
-// its "Add Set" button both extends `totalSets` for just today
-// (session.extraSets, not the plan template) and logs the set in one tap,
-// rather than a separate always-visible "+ Add Set" button.
+// Once every planned set is logged, a light-green "Add Set" button
+// appears in place of the next row; tapping it extends `totalSets` for
+// just today (session.extraSets, not the plan template), which brings
+// back a normal editable set-row to log into.
 function exerciseCard(node, path, onLog, baseTotalSets = node.sets) {
   const totalSets = baseTotalSets + (App.session.extraSets[path] || 0);
   const logged = loggedSetsFor(App.session, path);
@@ -185,30 +219,32 @@ function exerciseCard(node, path, onLog, baseTotalSets = node.sets) {
         onclick: isLast ? () => { undoLastSet(App.session, path); App.saveActiveSession(); } : undefined,
       }, [
         ['span.set-index', `${i + 1}`],
-        ['span.set-value', `${logged[i].weight}${node.unit} × ${logged[i].reps}`],
+        ['span.set-value', node.bodyweight ? `${logged[i].reps} reps` : `${logged[i].weight}${node.unit} × ${logged[i].reps}`],
         isLast ? ['span.set-undo', '↺'] : null,
       ]]);
     } else if (i === logged.length) {
       rows.push(['div.set-row.set-active', { key: `s${i}` }, [
         ['span.set-index', `${i + 1}`],
-        stepperControl(draft.weight, (v) => { draft.weight = v; }, { min: 0, step: weightStep(node.unit) }),
+        node.bodyweight ? null : stepperControl(draft.weight, (v) => { draft.weight = v; }, { min: 0, step: weightStep(node.unit) }),
         stepperControl(draft.reps, (v) => { draft.reps = v; }, { min: 0, step: 1 }),
         ['button.btn-success.set-log-btn', { onclick: () => onLog(draft) }, 'Log'],
       ]]);
     } else {
       rows.push(['div.set-row.set-future', { key: `s${i}` }, [
         ['span.set-index', `${i + 1}`],
-        ['span.set-target', `${node.weight}${node.unit} × ${node.repRange.min}-${node.repRange.max}`],
+        ['span.set-target', node.bodyweight
+          ? `${node.repRange.min}-${node.repRange.max} reps`
+          : `${node.weight}${node.unit} × ${node.repRange.min}-${node.repRange.max}`],
       ]]);
     }
   }
+  // Every planned set is done. Rather than an extra pre-filled logging row,
+  // show a light-green "Add Set" button: tapping it just adds one more
+  // loggable set for today (session.extraSets), which makes `done` false so
+  // the normal editable set-row below takes its place — the button
+  // reappears once that set is logged.
   if (done) {
-    rows.push(['div.set-row.set-active', { key: 'extra' }, [
-      ['span.set-index', `${totalSets + 1}`],
-      stepperControl(draft.weight, (v) => { draft.weight = v; }, { min: 0, step: weightStep(node.unit) }),
-      stepperControl(draft.reps, (v) => { draft.reps = v; }, { min: 0, step: 1 }),
-      ['button.btn-success.set-log-btn', { onclick: () => { App.addExtraSet(path); onLog(draft); } }, 'Add Set'],
-    ]]);
+    rows.push(['button.btn-add-set', { key: 'extra', onclick: () => App.addExtraSet(path) }, '+ Add Set']);
   }
 
   return ['div.card.exercise-card', { key: path, class: done ? 'done' : '' }, [
@@ -216,7 +252,7 @@ function exerciseCard(node, path, onLog, baseTotalSets = node.sets) {
       ['span.exercise-name', node.name],
       ['span.exercise-target', `${node.repRange.min}-${node.repRange.max} reps`],
     ]],
-    lastSet ? ['p.exercise-last', `Last: ${lastSet.weight}${node.unit} × ${lastSet.reps}`] : null,
+    lastSet ? ['p.exercise-last', node.bodyweight ? `Last: ${lastSet.reps} reps` : `Last: ${lastSet.weight}${node.unit} × ${lastSet.reps}`] : null,
     ['div.set-rows', rows],
   ]];
 }
@@ -334,24 +370,28 @@ function activeSessionView() {
   ]];
 }
 
-// A proposed 'increase' needs an explicit Accept (see model.js's
-// finishSession/acceptProgressionIncrease) — 'decrease' and 'none' are
-// already applied or need no action, so they show no button.
+// Both a proposed 'increase' and a proposed 'decrease' need an explicit
+// Accept (see model.js's finishSession/acceptProgressionChange); 'none'
+// needs no action, so it shows no button.
+function isProposal(r) {
+  return r.change === 'increase' || r.change === 'decrease';
+}
+
 function summaryExerciseRow(r) {
   return ['div.row.summary-exercise-row', { key: r.name }, [
     changeIcon(r.change),
     ['span.summary-exercise-name', r.name],
     ['span.summary-exercise-detail', progressionChangeDetail(r.change, r.from, r.to, r.unit)],
-    r.change === 'increase' ? (r.accepted
+    isProposal(r) ? (r.accepted
       ? ['span.summary-accepted', '✓']
-      : ['button.btn-success.btn-small', { onclick: () => App.acceptIncrease(r) }, 'Accept']) : null,
+      : ['button.btn-success.btn-small', { onclick: () => App.acceptChange(r) }, 'Accept']) : null,
   ]];
 }
 
 function sessionSummaryView() {
   const summary = App.finishSummary;
   if (!summary) return null;
-  const pendingIncreases = summary.results.filter((r) => r.change === 'increase' && !r.accepted);
+  const pending = summary.results.filter((r) => isProposal(r) && !r.accepted);
   return ['div.container', [
     ['section', [
       ['h2', `Workout ${summary.workoutName} complete`],
@@ -363,16 +403,27 @@ function sessionSummaryView() {
           ['span.stat-label', 'Weight Lifted'],
         ]],
       ]],
-      ['div.summary-exercises-header', [
-        ['h3', 'Exercises'],
-        pendingIncreases.length > 1
-          ? ['button.btn-success.btn-small', { onclick: () => App.acceptAllIncreases() }, 'Accept All']
-          : null,
-      ]],
+      ['h3', 'Exercises'],
       ['div.summary-exercise-list', summary.results.map((r) => summaryExerciseRow(r))],
-      ['button.btn-success', { onclick: () => { App.finishSummary = null; App.page = 'home'; } }, 'Done'],
+      ['div.summary-actions', [
+        pending.length
+          ? ['button.btn-secondary', { onclick: () => App.acceptAllChanges() }, 'Accept All']
+          : null,
+        ['button.btn-success', { onclick: () => { App.finishSummary = null; App.page = 'home'; } }, 'Done'],
+      ]],
     ]],
   ]];
+}
+
+// Toggling bodyweight on/off nulls or restores weight/unit/progression
+// together, the same shape newExercise({bodyweight}) produces — there's
+// nothing for double progression to act on without a weight to track.
+function setBodyweight(node, bodyweight, save) {
+  node.bodyweight = bodyweight;
+  node.weight = bodyweight ? null : 0;
+  node.unit = bodyweight ? null : App.settings.unit;
+  node.progression = bodyweight ? null : { type: 'double-progression', increment: 2.5 };
+  save();
 }
 
 function exerciseFieldsEditor(node, save) {
@@ -383,7 +434,15 @@ function exerciseFieldsEditor(node, save) {
       ['span', '–'],
       numberInput(node.repRange.max, (v) => { node.repRange.max = v; save(); }, { min: 1 }),
     ]]]],
-    ['label.field', ['Weight', ['div.weight-unit', [
+    ['label.field.field-checkbox', [
+      ['input', {
+        type: 'checkbox',
+        checked: node.bodyweight,
+        onchange: (e) => setBodyweight(node, e.target.checked, save),
+      }],
+      'Bodyweight',
+    ]],
+    node.bodyweight ? null : ['label.field', ['Weight', ['div.weight-unit', [
       numberInput(node.weight, (v) => { node.weight = v; save(); }, { min: 0, step: 0.5 }),
       ['select', { value: node.unit, onchange: (e) => { node.unit = e.target.value; save(); } }, [
         ['option', { value: 'lb' }, 'lb'],
@@ -391,7 +450,7 @@ function exerciseFieldsEditor(node, save) {
       ]],
     ]]]],
     numberField('Rest (sec)', node.restSeconds, (v) => { node.restSeconds = v; save(); }, { min: 0, step: 5 }),
-    numberField('+/− weight on progression', node.progression.increment, (v) => { node.progression.increment = v; save(); }, { min: 0, step: 0.5 }),
+    node.bodyweight ? null : numberField('+/− weight on progression', node.progression.increment, (v) => { node.progression.increment = v; save(); }, { min: 0, step: 0.5 }),
   ]];
 }
 
@@ -499,7 +558,7 @@ function sessionDetailRow(e) {
       ['span.session-exercise-name', e.name],
       detail ? ['span.summary-exercise-detail', detail] : null,
     ]],
-    ['div.session-exercise-sets', e.sets.map((set, i) => ['span.past-set', { key: i }, `${set.weight}${e.unit}×${set.reps}`])],
+    ['div.session-exercise-sets', e.sets.map((set, i) => ['span.past-set', { key: i }, e.bodyweight ? `${set.reps} reps` : `${set.weight}${e.unit}×${set.reps}`])],
   ]];
 }
 
@@ -907,24 +966,26 @@ const App = {
     App.saveSessions();
     App.savePlans();
     App.finishSummary = {
-      workoutName: workout.name, workout, results, setCount, totalVolume, durationMs, unit: App.settings.unit,
+      workoutName: workout.name, plan, results, setCount, totalVolume, durationMs, unit: App.settings.unit,
     };
     App.clearSession();
     App.page = 'sessionSummary';
   },
 
-  // A proposed weight increase (see model.js's finishSession) isn't
-  // applied to the plan until accepted here.
-  acceptIncrease: (result) => {
-    acceptProgressionIncrease(App.finishSummary.workout, result.nodeId, result.to);
+  // A proposed weight change (increase or decrease — see model.js's
+  // finishSession) isn't applied to the plan until accepted here. It
+  // moves every exercise of the same name across the plan's workouts,
+  // not just the one logged (Curls on A day and B day track together).
+  acceptChange: (result) => {
+    acceptProgressionChange(App.finishSummary.plan, result.name, result.to);
     result.accepted = true;
     App.savePlans();
   },
 
-  acceptAllIncreases: () => {
+  acceptAllChanges: () => {
     App.finishSummary.results
-      .filter((r) => r.change === 'increase' && !r.accepted)
-      .forEach((r) => App.acceptIncrease(r));
+      .filter((r) => isProposal(r) && !r.accepted)
+      .forEach((r) => App.acceptChange(r));
   },
 
   // No confirmation — a deliberate choice: Cancel just exits, nothing logged.

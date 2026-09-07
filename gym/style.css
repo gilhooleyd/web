@@ -86,7 +86,11 @@ button:has(.icon-trash) {
   bottom: 0;
   display: flex;
   align-items: center;
-  min-height: 3.75rem;
+  /* Keep the 3.75rem of tappable bar ABOVE the iOS home indicator: the
+     inset is extra height, not carved out of the buttons. Needs
+     `viewport-fit=cover` in index.html's viewport meta or the inset is
+     always 0. */
+  min-height: calc(3.75rem + env(safe-area-inset-bottom));
   background: white;
   border-top: 1px solid #e5e9f0;
   padding-bottom: env(safe-area-inset-bottom);
@@ -111,7 +115,10 @@ button:has(.icon-trash) {
 
 .session-bar {
   justify-content: space-between;
+  /* Re-declare the safe-area padding the shorthand above would otherwise
+     reset to 0 — this is the bar with Cancel/Finish on it. */
   padding: 0 1rem;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .session-bar-title {
@@ -274,7 +281,7 @@ button:has(.icon-trash) {
 }
 
 .exercise-card.done {
-  background-color: #f2faf3;
+  background-color: #e2f1e5;
 }
 
 .exercise-card-header {
@@ -367,6 +374,17 @@ button:has(.icon-trash) {
   color: #666;
 }
 
+/* Shown once every planned set is logged — a light-green invitation to
+   add one more set for today, replaced by a real editable set-row the
+   moment it's tapped (see exerciseCard in script.js). */
+.btn-add-set {
+  width: 100%;
+  background: #e6f6ea;
+  color: #248a3d;
+  border: 1px dashed #b8e2c4;
+  font-weight: 600;
+}
+
 /* Always its own full-width row below the index/steppers — keeps the
    active row from ever needing to fit index + two steppers + a button
    on one line, which doesn't reliably fit on a narrow phone. */
@@ -398,6 +416,27 @@ button:has(.icon-trash) {
   font-size: 1rem;
   font-weight: 700;
   color: #222;
+}
+
+/* The value is a real <input> (tap = numeric keyboard, typeable on a
+   laptop) — strip it back to look like the old plain-text readout. */
+input.stepper-value {
+  width: 3.1rem;
+  min-width: 0;
+  padding: 0.2rem 0.15rem;
+  margin: 0;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  background: white;
+  min-height: 1.9rem;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input.stepper-value::-webkit-outer-spin-button,
+input.stepper-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .group-block {
@@ -562,6 +601,20 @@ button:has(.icon-trash) {
   border-radius: 8px;
   width: 4.6rem;
   min-height: 2.1rem;
+}
+
+.field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  text-transform: none;
+  font-size: 0.85rem;
+  color: #444;
+  align-self: flex-end;
+}
+
+.field-checkbox input {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .rep-range,
@@ -872,14 +925,15 @@ button:has(.icon-trash) {
   font-size: 0.85rem;
 }
 
-.summary-exercises-header {
+/* Accept All (when there are unaccepted proposals) sits on the same row
+   as Done at the bottom of the summary. */
+.summary-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 0.5rem;
 }
 
-.summary-exercises-header h3 {
-  margin: 0;
+.summary-actions .btn-success {
+  flex: 1;
 }
 
 /* Change indicator — plain triangle glyphs (not emoji) so color is
