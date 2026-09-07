@@ -10,7 +10,7 @@ const STORAGE_KEYS = {
   activeSession: 'gym.activeSession',
 };
 
-const DEFAULT_SETTINGS = { activePlanId: null, unit: 'lb' };
+const DEFAULT_SETTINGS = { unit: 'lb' };
 
 function downloadBlob(content, mime, filename) {
   const blob = new Blob([content], { type: mime });

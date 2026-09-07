@@ -262,9 +262,17 @@ function nextWorkout(plan) {
   return plan.workouts.find((w) => w.id === workoutId) || null;
 }
 
-function advanceCycle(plan) {
-  if (!plan.cycle.length) return plan.cursor;
-  return (plan.cursor + 1) % plan.cycle.length;
+// Where the plan's "next" pointer lands after `workout` is finished.
+// Following the rotation (you did the day the cursor already pointed at)
+// just steps forward one. Picking some other day jumps the pointer to the
+// slot right after that day, so "Next" tracks where you actually are. A
+// workout that isn't in the cycle at all leaves the pointer untouched.
+function advanceCycle(plan, workout) {
+  const { cycle, cursor } = plan;
+  if (!cycle.length || !workout) return cursor;
+  if (cycle[cursor % cycle.length] === workout.id) return (cursor + 1) % cycle.length;
+  const idx = cycle.indexOf(workout.id);
+  return idx === -1 ? cursor : (idx + 1) % cycle.length;
 }
 
 // ---------------------------------------------------------------------
@@ -415,7 +423,7 @@ function finishSession(plan, workout, session) {
 
   session.entries = storedEntries;
   session.finishedAt = new Date().toISOString();
-  plan.cursor = advanceCycle(plan);
+  plan.cursor = advanceCycle(plan, workout);
 
   return results;
 }
@@ -467,6 +475,16 @@ function exerciseSeries(sessions, name) {
     })
     .filter(Boolean)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// The `date` ("YYYY-MM-DD") of the most recent finished session logged
+// against `planId`, or null if this plan has never been completed — the
+// home screen's "last done N days ago" line.
+function lastPlanSessionDate(sessions, planId) {
+  const finished = sessions
+    .filter((s) => s.finishedAt && s.planId === planId)
+    .sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
+  return finished.length ? finished[0].date : null;
 }
 
 // The last set of the most recent session that logged this exercise (by

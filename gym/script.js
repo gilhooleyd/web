@@ -61,6 +61,20 @@ function weekdayAbbr(dateStr) {
   return WEEKDAY_ABBR[parseLocalDate(dateStr).getDay()];
 }
 
+// "today" / "yesterday" / "N days ago" for a stored "YYYY-MM-DD" date,
+// counting whole LOCAL calendar days (not 24h spans) so a workout logged
+// late last night still reads "yesterday" this morning. Lowercase so it
+// drops into "Last done ___" on the home screen.
+function relativeDayLabel(dateStr) {
+  const then = parseLocalDate(dateStr);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((startOfToday - then) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return `${days} days ago`;
+}
+
 // Parse a numeric field's raw string value, clamped to `min`.
 // Empty / non-numeric -> `min`.
 function clampNumber(raw, min = 0) {
@@ -312,50 +326,41 @@ function restFloat() {
 // Pages
 // ---------------------------------------------------------------------
 
-function planRow(p) {
-  const isActive = p.id === App.settings.activePlanId;
-  return ['div.row.plan-row', { key: p.id }, [
-    isActive
-      ? ['span.badge.badge-active', 'Active']
-      : ['button.btn-primary.btn-small', {
-        onclick: () => { App.settings.activePlanId = p.id; App.saveSettings(); },
-      }, 'Set Active'],
-    ['span.row-name', p.name],
-    ['button.icon-btn', { onclick: () => { App.editingPlanId = p.id; App.page = 'planEditor'; } }, [cogIcon()]],
+// One plan on the home screen: name + edit gear, when it was last done,
+// and a tappable row per workout. Each row leads with a blue "Next" badge
+// on the workout the plan's cycle points at; the other rows render the
+// same badge but hidden, so every day name lines up in one column. Every
+// day is startable, not just the "Next" one.
+function planCard(plan) {
+  const nextId = (nextWorkout(plan) || {}).id;
+  const lastDate = lastPlanSessionDate(App.sessions, plan.id);
+  return ['div.card.plan-card', { key: plan.id }, [
+    ['div.plan-card-header', [
+      ['span.plan-card-name', plan.name],
+      ['button.icon-btn', {
+        onclick: () => { App.editingPlanId = plan.id; App.page = 'planEditor'; },
+      }, [cogIcon()]],
+    ]],
+    ['p.plan-card-sub', lastDate ? `Last done ${relativeDayLabel(lastDate)}` : 'Not done yet'],
+    plan.workouts.length
+      ? ['div.day-rows', plan.workouts.map((w) => ['button.day-row', {
+        key: w.id,
+        onclick: () => App.startSession(plan, w),
+      }, [
+        ['span.badge.badge-next', { class: w.id === nextId ? '' : 'badge-hidden' }, 'Next'],
+        ['span.day-row-name', w.name],
+      ]])]
+      : ['p.plan-card-empty', 'No days yet — tap the gear to add one'],
   ]];
 }
 
 function homeView() {
-  const plan = App.plans.find((p) => p.id === App.settings.activePlanId);
-  const workout = plan && nextWorkout(plan);
-  const otherWorkouts = plan && workout ? plan.workouts.filter((w) => w.id !== workout.id) : (plan ? plan.workouts : []);
-
   return ['div.container', [
-    ['section.home-hero', !plan ? [
-      ['h2', 'Welcome'],
-      ['p', 'Create a plan below to get started.'],
-    ] : [
-      ['p.plan-label', plan.name],
-      !workout ? [
-        ['p', 'This plan has no workouts yet.'],
-        ['button.btn-primary', { onclick: () => { App.editingPlanId = plan.id; App.page = 'planEditor'; } }, 'Add Workouts'],
-      ] : [
-        ['h2', `Next: Workout ${workout.name}`],
-        ['button.btn-success.btn-large', { onclick: () => App.startSession(plan, workout) }, 'Start Workout'],
-      ],
-      otherWorkouts.length ? ['div.workout-picker', [
-        ['span.workout-picker-label', 'Or start:'],
-        ['div.workout-picker-chips', otherWorkouts.map((w) => ['button.btn-secondary.chip', {
-          key: w.id,
-          onclick: () => App.startSession(plan, w),
-        }, w.name])],
-      ]] : null,
-    ]],
-    ['section.plans-section', [
+    ['section', [
       ['h2', 'Plans'],
       App.plans.length === 0
         ? ['p.empty-hint', 'No plans yet.']
-        : ['div.plan-list', App.plans.map((p) => planRow(p))],
+        : ['div.plan-list', App.plans.map((p) => planCard(p))],
       ['button.btn-secondary', { onclick: () => App.createPlan() }, '+ New Plan'],
     ]],
   ]];
@@ -809,7 +814,6 @@ const App = {
     const plan = newPlan('New Plan');
     App.plans.push(plan);
     App.savePlans();
-    if (!App.settings.activePlanId) { App.settings.activePlanId = plan.id; App.saveSettings(); }
     App.editingPlanId = plan.id;
     App.page = 'planEditor';
   },
@@ -817,11 +821,8 @@ const App = {
   // The two starter plans (no logged history) — used both on a genuine
   // first run and by "Reset Data" in Settings.
   seedDefaultPlans: () => {
-    const plan = defaultPlan();
-    App.plans = [plan, pushPullPlan()];
-    App.settings.activePlanId = plan.id;
+    App.plans = [defaultPlan(), pushPullPlan()];
     App.savePlans();
-    App.saveSettings();
   },
 
   // Settings > "Reset Data": back to a fresh install — the two starter
@@ -836,12 +837,12 @@ const App = {
   },
 
   // Settings > "Add Test Data": simulates a few weeks of history against
-  // the active plan (same generator used to preview the app before this
+  // the first plan (same generator used to preview the app before this
   // was made opt-in) so there's something to look at in History without
   // actually logging real workouts.
   addTestData: () => {
-    const plan = App.plans.find((p) => p.id === App.settings.activePlanId);
-    if (!plan) { alert('No active plan to add test data to.'); return; }
+    const plan = App.plans[0];
+    if (!plan) { alert('Create a plan first.'); return; }
     const demoSessions = seedDemoSessions(plan);
     App.sessions = App.sessions.concat(demoSessions);
     App.saveSessions();
@@ -852,7 +853,6 @@ const App = {
   deletePlan: (plan) => {
     if (!confirm(`Delete plan "${plan.name}"? This does not delete its logged history.`)) return;
     App.plans = App.plans.filter((p) => p.id !== plan.id);
-    if (App.settings.activePlanId === plan.id) { App.settings.activePlanId = null; App.saveSettings(); }
     App.savePlans();
     if (App.editingPlanId === plan.id) { App.editingPlanId = null; App.page = 'home'; }
   },
