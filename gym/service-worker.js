@@ -21,8 +21,14 @@
  * CACHE_NAME still needs a manual bump when a shipped file changes (no
  * build step to hash content) — but stale-while-revalidate means a missed
  * bump self-heals on the following open rather than serving stale forever.
+ *
+ * Updates are user-gated: a new worker installs, precaches, and WAITS
+ * (no skipWaiting on install). The page detects the waiting worker and
+ * shows a banner; tapping it posts SKIP_WAITING here, this worker
+ * activates, and the page reloads into it (see the registration block in
+ * script.js).
  */
-const CACHE_NAME = 'gym-cache-v2';
+const CACHE_NAME = 'gym-cache-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -39,11 +45,16 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting()),
-  );
+  // No skipWaiting() here on purpose: a new worker installs and then
+  // WAITS. The page shows an "update available" banner and only when the
+  // user taps it (-> SKIP_WAITING message below) does this worker take
+  // over — so an update never yanks the page out from under someone
+  // mid-workout.
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

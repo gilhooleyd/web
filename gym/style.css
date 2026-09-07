@@ -76,6 +76,36 @@ button:has(.icon-trash) {
   padding-top: 0.75rem;
 }
 
+/* "New version available" — a fixed strip pinned to the top, above
+   everything else, that overlays the first bit of page content (rare,
+   and it's meant to be tapped or it clears on the next launch). */
+.update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  padding-top: calc(0.55rem + env(safe-area-inset-top));
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.2);
+}
+
+.update-banner button {
+  flex-shrink: 0;
+  min-height: 2rem;
+  padding: 0 0.9rem;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
 /* Bottom bar — always present. Normal pages show three text tabs; during
    an active session it switches to workout name + Cancel/Finish instead
    (see bottomBar() in script.js), same bar chrome either way. */
@@ -369,8 +399,18 @@ button:has(.icon-trash) {
   background: #eef4ff;
   justify-content: flex-start;
   flex-wrap: wrap;
-  row-gap: 0.5rem;
+  /* tighter column gap than a normal set-row so index + both steppers
+     stay on one line even on a narrow iPhone; the row gap still spaces
+     the Log button when it wraps below */
+  gap: 0.5rem 0.4rem;
   padding: 0.5rem;
+}
+
+/* The weight and reps steppers each take half the row and shrink their
+   input rather than wrapping onto separate lines. */
+.set-active .stepper {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .set-active .set-index {
@@ -408,13 +448,14 @@ button:has(.icon-trash) {
 .stepper {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .stepper-btn {
   width: 1.9rem;
   height: 1.9rem;
   min-height: 0;
+  flex-shrink: 0;
   font-size: 1.1rem;
   line-height: 1;
   padding: 0;
@@ -431,10 +472,13 @@ button:has(.icon-trash) {
 }
 
 /* The value is a real <input> (tap = numeric keyboard, typeable on a
-   laptop) — strip it back to look like the old plain-text readout. */
+   laptop) — strip it back to look like the old plain-text readout. It
+   flexes to fill the space left between the −/＋ buttons so two steppers
+   fit one row on a narrow phone, but never below a readable width. */
 input.stepper-value {
-  width: 3.1rem;
-  min-width: 0;
+  flex: 1 1 0;
+  width: auto;
+  min-width: 2.1rem;
   padding: 0.2rem 0.15rem;
   margin: 0;
   border: 1px solid #dde2ea;

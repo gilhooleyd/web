@@ -781,6 +781,17 @@ function tabBarItem(page, label) {
   }, label];
 }
 
+// Shown once a newer service worker has finished installing and is
+// waiting to take over (see the registration block at the bottom of this
+// file). "Reload" activates it and refreshes into the new version.
+function updateBanner() {
+  if (!App.updateReady) return null;
+  return ['div.update-banner', [
+    ['span', 'New version available'],
+    ['button', { onclick: () => App.applyUpdate() }, 'Reload'],
+  ]];
+}
+
 // The bottom bar is always present, but its content is contextual: normal
 // Home/History/Settings tabs, or — while a workout is in progress — the
 // workout name plus Cancel/Finish, so those controls stay reachable
@@ -821,6 +832,13 @@ const App = {
   rest: { endsAt: null, timerId: null }, // endsAt: ms timestamp, not a countdown — see restSecondsLeft
   workoutClockId: null, // ticks the bottom bar's elapsed-time display; see startWorkoutClock
   finishSummary: null,
+
+  // Service-worker update banner (see the registration block at the
+  // bottom of this file). A newer worker installs but waits; the banner
+  // lets the user activate it and reload into the new version.
+  swRegistration: null,
+  updateReady: false,
+  applyingUpdate: false,
 
   // Editors
   editingPlanId: null,
@@ -870,6 +888,16 @@ const App = {
   saveActiveSession: () => Storage.saveActiveSession(App.session),
 
   goto: (page) => { App.page = page; },
+
+  // "Reload" on the update banner: promote the waiting worker, which
+  // fires a controllerchange that reloads the page (see the registration
+  // block). Falls back to a plain reload if there's no worker waiting.
+  applyUpdate: () => {
+    App.applyingUpdate = true;
+    const waiting = App.swRegistration && App.swRegistration.waiting;
+    if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
+    else window.location.reload();
+  },
 
   createPlan: () => {
     const plan = newPlan('New Plan');
@@ -1083,6 +1111,7 @@ const App = {
   },
 
   view: () => h(['div.app-shell', [
+    updateBanner(),
     pageView(),
     bottomBar(),
   ]]),
@@ -1102,7 +1131,35 @@ document.addEventListener('visibilitychange', () => {
 // opened with no network at all can't run this for the first time (there's
 // nothing to serve it from yet), but every visit after the first online one
 // caches the app shell, so subsequent opens work with no signal.
+//
+// Update flow: a newly-deployed worker installs but stays "waiting" (it no
+// longer calls skipWaiting on its own). When it reaches that state and an
+// older worker is still controlling the page, App.updateReady flips on and
+// the update banner appears. App.applyUpdate() posts SKIP_WAITING to it;
+// the browser then swaps controllers, which fires controllerchange, and
+// we reload once into the new version.
 if ('serviceWorker' in navigator) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (App.applyingUpdate && !reloading) { reloading = true; window.location.reload(); }
+  });
+
   navigator.serviceWorker.register('service-worker.js')
+    .then((reg) => {
+      App.swRegistration = reg;
+      // `controller` is null on the very first install — nothing to update
+      // *from* — so a banner only makes sense when one already exists.
+      const flagUpdate = () => {
+        if (navigator.serviceWorker.controller) { App.updateReady = true; m.redraw(); }
+      };
+      if (reg.waiting) flagUpdate();
+      reg.addEventListener('updatefound', () => {
+        const worker = reg.installing;
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed') flagUpdate();
+        });
+      });
+    })
     .catch((err) => console.error('Service worker registration failed:', err));
 }
