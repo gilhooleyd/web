@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>WorkClock — Shift & Mood Tracker</title>
+  <meta name="description" content="Simple single-page work clock-in/clock-out tracker with daily mood survey, monthly calendar, and weekly analytics." />
+
+  <!-- iOS Home Screen PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="WorkClock" />
+  <meta name="theme-color" content="#f6f5f0" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <polyline points="12 7 12 12 15.5 14"></polyline>
+          </svg>
+        </div>
+        <h1>WorkClock</h1>
+      </div>
+      <div id="header-date-pill" class="current-date-pill mono"></div>
+    </header>
+
+    <!-- VIEW 1: CLOCK IN / OUT -->
+    <main id="view-clock" class="view-section active" aria-label="Clock In and Out">
+      <section class="clock-hero-card">
+        <div id="clock-status-badge" class="status-badge">
+          <span class="status-dot"></span>
+          <span id="clock-status-text">Off the Clock</span>
+        </div>
+
+        <div class="clock-button-wrap">
+          <button id="clock-toggle-btn" class="clock-toggle-btn" type="button">
+            <svg id="clock-btn-icon" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span id="clock-btn-label" class="clock-btn-label">Clock In</span>
+            <span id="clock-btn-sub" class="clock-btn-sub mono">Tap to start shift</span>
+          </button>
+        </div>
+
+        <div id="active-session-panel" class="active-session-info hidden">
+          <div class="session-metrics">
+            <div class="metric-item">
+              <span class="metric-label">Clocked In At</span>
+              <span id="clocked-in-time-val" class="metric-value mono">--:--</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Elapsed Time</span>
+              <span id="elapsed-time-val" class="metric-value mono">00:00:00</span>
+            </div>
+          </div>
+          <button id="cancel-shift-btn" class="cancel-session-btn" type="button">
+            Cancel Current Shift
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">Recent Shifts</h2>
+          <span id="today-total-badge" class="mono" style="font-size: 0.82rem; font-weight: 700; color: var(--primary);"></span>
+        </div>
+        <div id="recent-logs-list" class="today-logs-list"></div>
+      </section>
+    </main>
+
+    <!-- VIEW 2: HISTORY (MONTH CALENDAR & WEEK LINE GRAPH) -->
+    <main id="view-history" class="view-section" aria-label="Work History">
+      <div class="segmented-control" role="tablist">
+        <button id="subtab-month-btn" class="segment-btn active" type="button" role="tab" aria-selected="true">
+          Month View
+        </button>
+        <button id="subtab-week-btn" class="segment-btn" type="button" role="tab" aria-selected="false">
+          Week Graph
+        </button>
+      </div>
+
+      <!-- Summary Stats Strip -->
+      <div class="stats-strip">
+        <div class="stat-box">
+          <div class="stat-box-label">Total Hours</div>
+          <div id="stat-total-hours" class="stat-box-val mono">0.0h</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-label">Avg / Day</div>
+          <div id="stat-avg-hours" class="stat-box-val mono">0.0h</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-label">Avg Mood</div>
+          <div id="stat-avg-mood" class="stat-box-val mono">-</div>
+        </div>
+      </div>
+
+      <!-- Month View Panel -->
+      <section id="history-month-panel" class="card">
+        <div class="period-nav">
+          <button id="month-prev-btn" class="nav-icon-btn" type="button" aria-label="Previous Month">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span id="month-label" class="period-label">October 2026</span>
+          <button id="month-next-btn" class="nav-icon-btn" type="button" aria-label="Next Month">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div class="weekdays-grid">
+          <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid"></div>
+      </section>
+
+      <!-- Week View Panel -->
+      <section id="history-week-panel" class="card" style="display: none;">
+        <div class="period-nav">
+          <button id="week-prev-btn" class="nav-icon-btn" type="button" aria-label="Previous Week">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span id="week-label" class="period-label">Oct 4 – Oct 10</span>
+          <button id="week-next-btn" class="nav-icon-btn" type="button" aria-label="Next Week">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div id="week-chart-container" class="chart-container"></div>
+        <div class="chart-legend">
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: var(--primary);"></span>
+            <span>Hours Worked</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: var(--active-amber);"></span>
+            <span>Mood Rating (1–5)</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- VIEW 3: SETTINGS -->
+    <main id="view-settings" class="view-section" aria-label="Settings and Data">
+      <section class="card settings-group">
+        <h2 class="card-title">CSV Data Backup</h2>
+        <p class="settings-desc">
+          All shift hours and mood ratings are stored locally on your device. Export your history to CSV or import an existing CSV log.
+        </p>
+        <div class="btn-stack">
+          <button id="export-csv-btn" class="action-btn primary" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export Shifts to CSV
+          </button>
+          <button id="import-csv-btn" class="action-btn" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Import Shifts from CSV
+          </button>
+          <input id="csv-file-input" type="file" accept=".csv,text/csv" style="display: none;" />
+        </div>
+      </section>
+
+      <section class="card settings-group">
+        <h2 class="card-title">Test Data & Storage</h2>
+        <p class="settings-desc">
+          Prefill the past 30 days with realistic test shifts and mood ratings, or clear all stored records.
+        </p>
+        <div class="btn-stack">
+          <button id="prefill-data-btn" class="action-btn" type="button">
+            Prefill Last Month with Test Data
+          </button>
+          <button id="clear-data-btn" class="action-btn danger" type="button">
+            Clear All Data
+          </button>
+        </div>
+      </section>
+
+      <section class="card settings-group">
+        <h2 class="card-title">Install on iOS Home Screen</h2>
+        <p class="settings-desc">
+          In Safari on iPhone or iPad, tap the <strong>Share</strong> icon in the bottom bar and choose <strong>Add to Home Screen</strong> for a full-screen offline app experience.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <!-- Doctor's Office Mood Survey Modal (1 to 5 Faces) -->
+  <div id="survey-modal-backdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="survey-modal-title">
+    <div class="survey-modal">
+      <h2 id="survey-modal-title" class="survey-title">How was work today?</h2>
+      <p id="survey-shift-summary" class="survey-subtitle mono">Shift logged: 8.0 hrs</p>
+      <div id="faces-chart-container" class="faces-chart"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-msg" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- Bottom Bar -->
+  <nav class="bottom-nav" aria-label="Primary Navigation">
+    <div class="bottom-nav-inner">
+      <button id="nav-clock-btn" class="nav-tab active" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span>Clock</span>
+      </button>
+      <button id="nav-history-btn" class="nav-tab" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span>History</span>
+      </button>
+      <button id="nav-settings-btn" class="nav-tab" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </div>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
