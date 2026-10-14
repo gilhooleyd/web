@@ -988,6 +988,11 @@
       });
       activeStartISO = localStorage.getItem(STORAGE_KEYS.ACTIVE_START) || null;
       renderClockView();
+
+      // Check for PWA updates on resume
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {});
+      }
     };
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') handleResume();
@@ -996,8 +1001,18 @@
 
     // Register Service Worker for offline PWA support
     if ('serviceWorker' in navigator) {
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!reloading) {
+          reloading = true;
+          window.location.reload();
+        }
+      });
+
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+          reg.update().catch(() => {});
+        }).catch(() => {});
       });
     }
   }
