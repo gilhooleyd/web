@@ -61,6 +61,42 @@
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  function formatActiveStartTime(isoStr) {
+    const d = new Date(isoStr);
+    const todayKey = toDateKey(new Date());
+    const startKey = toDateKey(d);
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (startKey === todayKey) {
+      return timeStr;
+    }
+    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return `${dateStr}, ${timeStr}`;
+  }
+
+  function toLocalDatetimeInputValue(dateOrISO) {
+    const d = new Date(dateOrISO);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${mins}`;
+  }
+
+  function parseLocalDatetime(str) {
+    if (!str) return null;
+    const parts = str.split('T');
+    if (parts.length !== 2) return null;
+    const dateParts = parts[0].split('-').map(Number);
+    const timeParts = parts[1].split(':').map(Number);
+    if (dateParts.length !== 3 || timeParts.length < 2) return null;
+    const [year, month, day] = dateParts;
+    const [hours, minutes] = timeParts;
+    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) return null;
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  }
+
   function formatElapsed(ms) {
     const totalSec = Math.max(0, Math.floor(ms / 1000));
     const hrs = String(Math.floor(totalSec / 3600)).padStart(2, '0');
@@ -74,6 +110,7 @@
   let activeStartISO = null;
   let pendingShift = null;
   let elapsedTimer = null;
+  let selectedHistoryDate = null;
 
   // History navigation state
   let currentHistorySubtab = 'month'; // 'month' | 'week'
@@ -267,7 +304,7 @@
       btnLabel.textContent = 'Clock Out';
       btnSub.textContent = 'Tap to finish & rate';
       sessionPanel.classList.remove('hidden');
-      clockedInTimeVal.textContent = formatTimeShort(activeStartISO);
+      clockedInTimeVal.textContent = formatActiveStartTime(activeStartISO);
 
       const updateTick = () => {
         const ms = Date.now() - new Date(activeStartISO).getTime();
@@ -304,7 +341,7 @@
           const dObj = new Date(item.date + 'T12:00:00');
           const niceDate = dObj.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
           return `
-            <div class="log-row">
+            <div class="log-row" data-id="${item.id}" style="cursor: pointer;" title="Tap to edit this shift">
               <div class="log-row-left">
                 <span class="log-times mono">${formatTimeShort(item.clockIn)} – ${formatTimeShort(item.clockOut)}</span>
                 <span class="log-date-sub">${niceDate}</span>
@@ -601,6 +638,174 @@
     renderHistoryView();
   }
 
+  // Active Start Time Editing Modal
+  function openActiveStartModal() {
+    if (!activeStartISO) {
+      showToast('You must be clocked in to edit start time');
+      return;
+    }
+    const input = document.getElementById('active-start-input');
+    input.value = toLocalDatetimeInputValue(activeStartISO);
+    document.getElementById('active-start-modal-backdrop').classList.remove('hidden');
+  }
+
+  function closeActiveStartModal() {
+    document.getElementById('active-start-modal-backdrop').classList.add('hidden');
+  }
+
+  function handleActiveStartSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('active-start-input');
+    const parsed = parseLocalDatetime(input.value);
+    if (!parsed) {
+      showToast('Please enter a valid date and time');
+      return;
+    }
+    // Disallow future start times beyond a 1-minute buffer
+    if (parsed.getTime() > Date.now() + 60000) {
+      showToast('Start time cannot be in the future');
+      return;
+    }
+
+    activeStartISO = parsed.toISOString();
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_START, activeStartISO);
+    renderClockView();
+    closeActiveStartModal();
+    showToast('Start time updated');
+  }
+
+  // History Shift Editing Modal
+  function formatShiftOption(shift) {
+    const d = new Date(shift.clockIn);
+    const niceDate = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    const startStr = formatTimeShort(shift.clockIn);
+    const endStr = formatTimeShort(shift.clockOut);
+    return `${niceDate}: ${startStr} – ${endStr} (${shift.hours.toFixed(1)}h)`;
+  }
+
+  function updateHistoryEditDuration() {
+    const startInput = document.getElementById('history-edit-start-input');
+    const endInput = document.getElementById('history-edit-end-input');
+    const durationVal = document.getElementById('history-edit-duration-val');
+    const saveBtn = document.getElementById('history-edit-save-btn');
+
+    const start = parseLocalDatetime(startInput.value);
+    const end = parseLocalDatetime(endInput.value);
+
+    if (!start || !end) {
+      durationVal.textContent = '-- hrs';
+      durationVal.classList.remove('error');
+      saveBtn.disabled = true;
+      return;
+    }
+
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs <= 0) {
+      durationVal.textContent = 'End time must be after start time';
+      durationVal.classList.add('error');
+      saveBtn.disabled = true;
+    } else {
+      const diffHours = diffMs / (1000 * 3600);
+      durationVal.textContent = `${diffHours.toFixed(2)} hrs`;
+      durationVal.classList.remove('error');
+      saveBtn.disabled = false;
+    }
+  }
+
+  function populateHistoryEditFields() {
+    const select = document.getElementById('history-edit-shift-select');
+    const shiftId = select.value;
+    const shift = logs.find((l) => l.id === shiftId);
+    if (!shift) return;
+
+    document.getElementById('history-edit-start-input').value = toLocalDatetimeInputValue(shift.clockIn);
+    document.getElementById('history-edit-end-input').value = toLocalDatetimeInputValue(shift.clockOut);
+    updateHistoryEditDuration();
+  }
+
+  function openHistoryEditModal(targetShiftId = null) {
+    if (logs.length === 0) {
+      showToast('No shifts recorded to edit');
+      return;
+    }
+
+    const select = document.getElementById('history-edit-shift-select');
+    const sorted = [...logs].sort((a, b) => b.clockIn.localeCompare(a.clockIn));
+
+    select.innerHTML = sorted
+      .map((s) => `<option value="${s.id}">${formatShiftOption(s)}</option>`)
+      .join('');
+
+    let selectedId = sorted[0].id;
+    if (targetShiftId && logs.some((l) => l.id === targetShiftId)) {
+      selectedId = targetShiftId;
+    } else if (selectedHistoryDate && sorted.some((l) => l.date === selectedHistoryDate)) {
+      selectedId = sorted.find((l) => l.date === selectedHistoryDate).id;
+    }
+
+    select.value = selectedId;
+    populateHistoryEditFields();
+    document.getElementById('history-edit-modal-backdrop').classList.remove('hidden');
+  }
+
+  function closeHistoryEditModal() {
+    document.getElementById('history-edit-modal-backdrop').classList.add('hidden');
+  }
+
+  function handleHistoryEditSubmit(e) {
+    e.preventDefault();
+    const select = document.getElementById('history-edit-shift-select');
+    const shiftId = select.value;
+    const shift = logs.find((l) => l.id === shiftId);
+    if (!shift) {
+      showToast('Shift not found');
+      return;
+    }
+
+    const startInput = document.getElementById('history-edit-start-input');
+    const endInput = document.getElementById('history-edit-end-input');
+    const start = parseLocalDatetime(startInput.value);
+    const end = parseLocalDatetime(endInput.value);
+
+    if (!start || !end) {
+      showToast('Please enter valid start and end dates and times');
+      return;
+    }
+
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs <= 0) {
+      showToast('End time must be after start time');
+      return;
+    }
+
+    const diffHours = Math.round((diffMs / (1000 * 3600)) * 100) / 100;
+    shift.clockIn = start.toISOString();
+    shift.clockOut = end.toISOString();
+    shift.date = toDateKey(start);
+    shift.hours = diffHours;
+
+    logs.sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+    saveLogs();
+    renderAll();
+    closeHistoryEditModal();
+    showToast('Shift updated');
+  }
+
+  function handleHistoryDeleteShift() {
+    const select = document.getElementById('history-edit-shift-select');
+    const shiftId = select.value;
+    const shift = logs.find((l) => l.id === shiftId);
+    if (!shift) return;
+
+    if (!confirm('Are you sure you want to delete this shift?')) return;
+
+    logs = logs.filter((l) => l.id !== shiftId);
+    saveLogs();
+    renderAll();
+    closeHistoryEditModal();
+    showToast('Shift deleted');
+  }
+
   // Setup Doctor's Office 1-5 Survey Buttons
   function initSurveyModal() {
     const container = document.getElementById('faces-chart-container');
@@ -655,6 +860,42 @@
     document.getElementById('clock-toggle-btn').addEventListener('click', handleClockToggle);
     document.getElementById('cancel-shift-btn').addEventListener('click', handleCancelShift);
 
+    // Active start time editing
+    document.getElementById('edit-active-start-btn').addEventListener('click', openActiveStartModal);
+    document.getElementById('active-start-close-btn').addEventListener('click', closeActiveStartModal);
+    document.getElementById('active-start-cancel-btn').addEventListener('click', closeActiveStartModal);
+    document.getElementById('active-start-form').addEventListener('submit', handleActiveStartSubmit);
+    document.getElementById('active-start-modal-backdrop').addEventListener('click', (e) => {
+      if (e.target.id === 'active-start-modal-backdrop') closeActiveStartModal();
+    });
+
+    // History shift editing
+    document.getElementById('history-edit-btn').addEventListener('click', () => openHistoryEditModal());
+    document.getElementById('history-edit-close-btn').addEventListener('click', closeHistoryEditModal);
+    document.getElementById('history-edit-cancel-btn').addEventListener('click', closeHistoryEditModal);
+    document.getElementById('history-edit-shift-select').addEventListener('change', populateHistoryEditFields);
+    document.getElementById('history-edit-start-input').addEventListener('input', updateHistoryEditDuration);
+    document.getElementById('history-edit-end-input').addEventListener('input', updateHistoryEditDuration);
+    document.getElementById('history-edit-form').addEventListener('submit', handleHistoryEditSubmit);
+    document.getElementById('history-edit-delete-btn').addEventListener('click', handleHistoryDeleteShift);
+    document.getElementById('history-edit-modal-backdrop').addEventListener('click', (e) => {
+      if (e.target.id === 'history-edit-modal-backdrop') closeHistoryEditModal();
+    });
+
+    // Tap recent shift to edit
+    document.getElementById('recent-logs-list').addEventListener('click', (e) => {
+      const row = e.target.closest('.log-row[data-id]');
+      if (row) openHistoryEditModal(row.dataset.id);
+    });
+
+    // Close modals on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeActiveStartModal();
+        closeHistoryEditModal();
+      }
+    });
+
     // History subtabs (Month / Week)
     const subMonthBtn = document.getElementById('subtab-month-btn');
     const subWeekBtn = document.getElementById('subtab-week-btn');
@@ -699,10 +940,11 @@
       renderHistoryView();
     });
 
-    // Clicking a day in Month Calendar jumps to that week in Week Graph
+    // Clicking a day in Month Calendar jumps to that week in Week Graph and selects the date
     document.getElementById('calendar-grid').addEventListener('click', (e) => {
       const cell = e.target.closest('.cal-day[data-date]');
       if (!cell) return;
+      selectedHistoryDate = cell.dataset.date;
       const clickedDate = new Date(cell.dataset.date + 'T12:00:00');
       viewedWeekStart = getStartOfWeek(clickedDate);
       subWeekBtn.click();

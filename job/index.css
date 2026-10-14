@@ -252,17 +252,43 @@ html, body {
   color: var(--text);
 }
 
+.session-actions-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.session-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-start-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.edit-start-btn:hover {
+  background: var(--border);
+}
+
 .cancel-session-btn {
-  align-self: center;
   background: transparent;
   border: 1px solid hsla(4, 72%, 52%, 0.35);
   color: var(--danger);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 0.15s ease;
 }
 
 .cancel-session-btn:hover {
@@ -343,7 +369,45 @@ html, body {
   padding: 16px 8px;
 }
 
-/* Segmented History Toggle (Month / Week) */
+/* Segmented History Toggle (Month / Week) & Edit Action */
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.history-toolbar .segmented-control {
+  flex: 1;
+}
+
+.history-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.history-edit-btn:hover {
+  background: var(--surface-alt);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.history-edit-btn:active {
+  transform: scale(0.97);
+}
+
 .segmented-control {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -686,6 +750,147 @@ html, body {
   color: var(--text-muted);
   text-align: center;
   line-height: 1.15;
+}
+
+/* Generic Modal Card & Forms (Edit Start Time & History Shifts) */
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 440px;
+  padding: 22px 20px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: popIn 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  text-align: left;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.modal-close-icon-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.modal-close-icon-btn:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.modal-subtitle {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin-top: -6px;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+.duration-preview-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface-alt);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+}
+
+.duration-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.duration-val {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.duration-val.error {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
+.modal-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modal-danger-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.text-danger-btn {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.text-danger-btn:hover {
+  background: var(--danger-soft);
 }
 
 /* Bottom Navigation Bar */

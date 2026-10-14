@@ -66,9 +66,18 @@
               <span id="elapsed-time-val" class="metric-value mono">00:00:00</span>
             </div>
           </div>
-          <button id="cancel-shift-btn" class="cancel-session-btn" type="button">
-            Cancel Current Shift
-          </button>
+          <div class="session-actions-row">
+            <button id="edit-active-start-btn" class="session-btn edit-start-btn" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              <span>Edit Start Time</span>
+            </button>
+            <button id="cancel-shift-btn" class="session-btn cancel-session-btn" type="button">
+              Cancel Shift
+            </button>
+          </div>
         </div>
       </section>
 
@@ -83,12 +92,21 @@
 
     <!-- VIEW 2: HISTORY (MONTH CALENDAR & WEEK LINE GRAPH) -->
     <main id="view-history" class="view-section" aria-label="Work History">
-      <div class="segmented-control" role="tablist">
-        <button id="subtab-month-btn" class="segment-btn active" type="button" role="tab" aria-selected="true">
-          Month View
-        </button>
-        <button id="subtab-week-btn" class="segment-btn" type="button" role="tab" aria-selected="false">
-          Week Graph
+      <div class="history-toolbar">
+        <div class="segmented-control" role="tablist">
+          <button id="subtab-month-btn" class="segment-btn active" type="button" role="tab" aria-selected="true">
+            Month View
+          </button>
+          <button id="subtab-week-btn" class="segment-btn" type="button" role="tab" aria-selected="false">
+            Week Graph
+          </button>
+        </div>
+        <button id="history-edit-btn" class="history-edit-btn" type="button" aria-label="Edit Shift Times">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Edit</span>
         </button>
       </div>
 
@@ -202,6 +220,63 @@
       <h2 id="survey-modal-title" class="survey-title">How was work today?</h2>
       <p id="survey-shift-summary" class="survey-subtitle mono">Shift logged: 8.0 hrs</p>
       <div id="faces-chart-container" class="faces-chart"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Active Start Time -->
+  <div id="active-start-modal-backdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="active-start-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="active-start-modal-title" class="modal-title">Edit Start Time</h2>
+        <button id="active-start-close-btn" class="modal-close-icon-btn" type="button" aria-label="Close modal">✕</button>
+      </div>
+      <p class="modal-subtitle">Adjust the day and hour you clocked in</p>
+      <form id="active-start-form" class="modal-form">
+        <div class="form-group">
+          <label for="active-start-input" class="form-label">Start Date &amp; Time</label>
+          <input type="datetime-local" id="active-start-input" class="form-input mono" required />
+        </div>
+        <div class="modal-btn-row">
+          <button id="active-start-save-btn" class="action-btn primary" type="submit">Save</button>
+          <button id="active-start-cancel-btn" class="action-btn" type="button">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Edit History Shift Times -->
+  <div id="history-edit-modal-backdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="history-edit-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="history-edit-modal-title" class="modal-title">Edit Shift Times</h2>
+        <button id="history-edit-close-btn" class="modal-close-icon-btn" type="button" aria-label="Close modal">✕</button>
+      </div>
+      <p class="modal-subtitle">Select a shift and adjust its start and end times</p>
+      <form id="history-edit-form" class="modal-form">
+        <div class="form-group">
+          <label for="history-edit-shift-select" class="form-label">Shift</label>
+          <select id="history-edit-shift-select" class="form-select mono"></select>
+        </div>
+        <div class="form-group">
+          <label for="history-edit-start-input" class="form-label">Start Time (Day &amp; Hour)</label>
+          <input type="datetime-local" id="history-edit-start-input" class="form-input mono" required />
+        </div>
+        <div class="form-group">
+          <label for="history-edit-end-input" class="form-label">End Time (Day &amp; Hour)</label>
+          <input type="datetime-local" id="history-edit-end-input" class="form-input mono" required />
+        </div>
+        <div class="duration-preview-card">
+          <span class="duration-label">Calculated Duration</span>
+          <span id="history-edit-duration-val" class="duration-val mono">-- hrs</span>
+        </div>
+        <div class="modal-btn-row">
+          <button id="history-edit-save-btn" class="action-btn primary" type="submit">Save Changes</button>
+          <button id="history-edit-cancel-btn" class="action-btn" type="button">Cancel</button>
+        </div>
+        <div class="modal-danger-row">
+          <button id="history-edit-delete-btn" class="text-danger-btn" type="button">Delete This Shift</button>
+        </div>
+      </form>
     </div>
   </div>
 
